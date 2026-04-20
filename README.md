@@ -13,18 +13,27 @@ PipBoy arduino project on 2.4 inch ESP32-2432S024R with Resistive touch
  Upload speed: 460800
  PSRAm: Enabled
 
-*  libs : 
+*  libs :
+
  //esp32-audioi2s-master
+ 
  esp8266audio
+
  time from Michael Margolis
+
  HTTPClient
+
  ArduinoJson
  // ???? not use ogg lib https://github.com/pschatzmann/codec-ogg
 
-* Settings:
+
+* ====== Settings: =========
  Password default for wifi in wifi_module.cpp
+
  Default folder from SD card for mp3 in RadioModule.cpp
+ 
  In RadioModule.cpp pin 26 for output audio stream
+
 
 * ====== components =========
  
@@ -32,6 +41,7 @@ PipBoy arduino project on 2.4 inch ESP32-2432S024R with Resistive touch
  * RTC + EEPROM :   Tyni RTC I2C module DS1307 with EEPROM
  * connectors:       JST 1.25 4pin - for i2c bus
                   JST 1.25 2pin (2 pcs)  - for dinamic and battery
+   
  Для работы часов нужен модульс флэшкой памяти (на модуле должно быть две 8 ногих микросхемы)/ либо флэшка памяти отдельно i2c
  
 
@@ -39,9 +49,13 @@ PipBoy arduino project on 2.4 inch ESP32-2432S024R with Resistive touch
  * модуль сенсора пульса (опционально) пока не реализовано
  * флэшка microSD (до 32 гб, чем меньше тем лучше. оптимально - 8 гб) FAT32. С нее считывается музыка локально. Радиостанции из фалаут можно найти отдельно.
 
+
 ======= настройки и работа ======
+
 пароль вай вай запоминает последний введенный,
+
 координаты GPS и выбор температры( Celsius - Farengheit) запоминает последние введенные
+
 папку с MP3 файлами так же запоминает введенную (по умолчанию SD:/mp3/)
 
 ====== на главном экране ======
