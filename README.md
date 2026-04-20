@@ -1,5 +1,5 @@
 # PipBoy-CYD-Project
-PipBoy arduino project on 2.4 inch ESP32-2432S024R with Resistive touch
+PipBoy arduino project on Arduino on 2.4 inch ESP32-2432S024R with Resistive touch
 
 
 * ESP32 2.4" TFT ILI9341 + XPT2046 Touch + RTC DS1307 + AT24C32 EEPROM + WiFi
