@@ -24,7 +24,7 @@ PipBoy arduino project on 2.4 inch ESP32-2432S024R with Resistive touch
  HTTPClient
 
  ArduinoJson
- // ???? not use ogg lib https://github.com/pschatzmann/codec-ogg
+ // ???? not use now - for ogg lib https://github.com/pschatzmann/codec-ogg
 
 
 * ====== Settings: =========
