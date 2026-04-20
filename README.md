@@ -24,6 +24,7 @@ Default folder from SD card for mp3 in RadioModule.cpp
 in RadioModule.cpp pin 26 for autput audio stream
 
  ====== components =========
+ 
  CYD: 2.4 inch ESP32-2432S024R with Resistive touch (Only type-c usb connector, RGB led in Front near display. )
  RTC + EEPROM :   Tyni RTC I2C module DS1307
 connectors:       JST 1.25 4pin - for i2c bus
@@ -40,7 +41,9 @@ connectors:       JST 1.25 4pin - for i2c bus
 координаты GPS и выбор температры( Celsius - Farengheit) запоминает последние введенные
 
 папку с MP3 файлами так же запоминает введенную (по умолчанию SD:/mp3/)
+
 ====== на главном экране ======
+
 слева в углу 3 состояния:
 в рамке - активно
 wifi - подключен ли WiFi
