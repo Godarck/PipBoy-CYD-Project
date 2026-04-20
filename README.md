@@ -48,8 +48,11 @@ PipBoy arduino project on 2.4 inch ESP32-2432S024R with Resistive touch
  
  * CYD: 2.4 inch ESP32-2432S024R with Resistive touch (Only type-c usb connector, RGB led in Front near display. )
  * RTC + EEPROM :   Tyni RTC I2C module DS1307 with EEPROM
- * connectors:       JST 1.25 4pin - for i2c bus
-                  JST 1.25 2pin (2 pcs)  - for dinamic and battery
+ * connectors:
+ 
+    JST 1.25 4pin - for i2c bus
+
+    JST 1.25 2pin (2 pcs)  - for dinamic and battery
    
  Для работы часов нужен модульс флэшкой памяти (на модуле должно быть две 8 ногих микросхемы)/ либо флэшка памяти отдельно i2c
  
