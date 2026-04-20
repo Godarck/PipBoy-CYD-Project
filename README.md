@@ -6,12 +6,19 @@ PipBoy arduino project on 2.4 inch ESP32-2432S024R with Resistive touch
  * Стилизованный Pip-Boy из Fallout
 
 * Flash settings:
+  
  Flash mode: DIO
+ 
  Partition scheme: NoOta 2mb APP / 2mb SPIFFS
+ 
  Events run: core1
+ 
  Arduino runs: core1
+ 
  Upload speed: 460800
+ 
  PSRAm: Enabled
+ 
 
 *  libs :
 
