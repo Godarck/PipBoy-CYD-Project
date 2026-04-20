@@ -36,6 +36,7 @@ PipBoy arduino project on 2.4 inch ESP32-2432S024R with Resistive touch
 
 
 * ====== Settings: =========
+  
  Password default for wifi in wifi_module.cpp
 
  Default folder from SD card for mp3 in RadioModule.cpp
