@@ -33,6 +33,8 @@ PipBoy project from FallOut on Arduino on 2.4 inch ESP32-2432S024R with Resistiv
 
  ArduinoJson
  // ???? not use now - for ogg lib https://github.com/pschatzmann/codec-ogg
+ 
+ TFT_eSPI - configure User_setup.h on Arduino library like config.h in project
 
 
 * ====== Settings: =========
