@@ -1,4 +1,5 @@
 #include "radio.h"
+#include "config.h"
 #include <AudioFileSourceICYStream.h>
 #include <AudioFileSourceBuffer.h>
 #include <AudioFileSourceSD.h>
@@ -217,7 +218,7 @@ void radioInit()
 {
     Serial.println("[RADIO] Init");
     if (!out) {
-        out = new AudioOutputI2SNoDAC(26);  // ваш вариант с пином в конструкторе
+        out = new AudioOutputI2SNoDAC(RADIO_DAC_PIN);  // ваш вариант с пином в конструкторе
         out->SetGain(0);
     }
     if (!cmdQueue) cmdQueue = xQueueCreate(16, sizeof(Cmd));
