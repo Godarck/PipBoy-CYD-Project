@@ -5,6 +5,7 @@
   
 
 * ARDUINO IDE PREFERENCES:
+  
 Flash mod: DIO
 
 partition scheme: NoOta 2mb APP / 2mb SPIFFS
