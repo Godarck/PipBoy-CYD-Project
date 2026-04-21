@@ -1,8 +1,8 @@
 * ESP32 2.4" TFT ILI9341 + XPT2046 Touch + RTC DS1307 + AT24C32 EEPROM + WiFi
-* 
+  
 * Stylized Pip-Boy from Fallout
-* 
 
+* ARDUINO IDE PREFERENCES:
 Flash mod: DIO
 
 partition scheme: NoOta 2mb APP / 2mb SPIFFS
@@ -34,7 +34,7 @@ Default folder from SD card for mp3 in RadioModule.cpp
 in RadioModule.cpp pin 26 for output audio stream
 
 
-======= Components =========
+* ======= Components =========
 
 CYD: 2.4 inch ESP32-2432S024R with Resistive Touch (Only Type-C USB connector, RGB LED in front near display.)
 
@@ -54,7 +54,7 @@ Heart rate sensor module (optional) not yet implemented
 MicroSD flash card (up to 32 GB, the smaller the better. 8 GB is optimal) FAT32. Music is read from it locally. Fallout radio stations can be found separately.
 
 
-======= Features ======
+* ======= Features ======
 
 Wi-Fi password remembers the last entered one,
 
@@ -78,7 +78,7 @@ Wi-Fi functions: scanning, list of networks, connecting to a selected one (must 
 HP and AP indicators are calculated automatically, depending on the time of day. During the day, they decrease. After evening, they replenish.
 
 
-====== on the main screen ======
+* ====== on the main screen ======
 
 Left corner: 3 states:
 
