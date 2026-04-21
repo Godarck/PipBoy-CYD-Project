@@ -13,7 +13,7 @@ arduino runs: core1
 
 Upload speed: 460800
 
-PSRAm: Enabled 
+PSRAM: Enabled 
 
 
 libs:
