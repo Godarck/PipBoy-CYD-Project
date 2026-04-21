@@ -1,99 +1,65 @@
-# PipBoy-CYD-Project
-PipBoy project from FallOut on Arduino on 2.4 inch ESP32-2432S024R with Resistive touch
+* ESP32 2.4" TFT ILI9341 + XPT2046 Touch + RTC DS1307 + AT24C32 EEPROM + WiFi 
+* Stylized Pip-Boy from Fallout
 
+Flash mod: DIO
+partition scheme: NoOta 2mb APP / 2mb SPIFFS
+events run: core1
+arduino runs: core1
+Upload speed: 460800
+PSRAm: Enabled 
 
-* ESP32 2.4" TFT ILI9341 + XPT2046 Touch + RTC DS1307 + AT24C32 EEPROM + WiFi
- * Стилизованный Pip-Boy из Fallout
-  
+libs:
+//esp32-audioi2s-master
+esp8266audio
+time from Michael Margolis
+HTTPClient
+Arduino Json
+// ???? not use ogg lib https://github.com/pschatzmann/codec-ogg
 
-* Flash settings:
-  
- Flash mode: DIO
- 
- Partition scheme: NoOta 2mb APP / 2mb SPIFFS
- 
- Events run: core1
- 
- Arduino runs: core1
- 
- Upload speed: 460800
- 
- PSRAm: Enabled
- 
+password default for wifi in wifi_module.cpp
+Default folder from SD card for mp3 in RadioModule.cpp
+in RadioModule.cpp pin 26 for output audio stream
 
-*  libs :
+======= Components =========
+CYD: 2.4 inch ESP32-2432S024R with Resistive Touch (Only Type-C USB connector, RGB LED in front near display.)
+RTC + EEPROM: Tyni RTC I2C module DS1307
+Connectors: JST 1.25 4-pin - for I2C bus
+JST 1.25 2-pin (2 pcs) - for speaker and battery
+For the watch to work, a module with flash memory is required (the module must have two 8-pin chips) or a separate I2C flash memory card.
 
- //esp32-audioi2s-master
- 
- esp8266audio
+Speaker (can be from a mobile phone, for example, from old iPhones)
+Heart rate sensor module (optional) not yet implemented
+MicroSD flash card (up to 32 GB, the smaller the better. 8 GB is optimal) FAT32. Music is read from it locally. Fallout radio stations can be found separately.
 
- time from Michael Margolis
+======= Features ======
+Wi-Fi password remembers the last entered one,
+GPS coordinates and temperature selection (Celsius - Fahrenheit) remember the last entered ones,
 
- HTTPClient
+MP3 folder also remembers the entered one (SD:/mp3/ by default)
 
- ArduinoJson
- // ???? not use now - for ogg lib https://github.com/pschatzmann/codec-ogg
- 
- TFT_eSPI - configure User_setup.h on Arduino library like config.h in project
+Clock function. Time synchronization via WiFi
+Background radio playback via WiFi or from an SD card
+3 timers counting down in minutes to a specified time (stylistically displayed on the right side of the main screen as a list of items and their quantity)
+Several character status images for the main screen
+Weather display function for specified location coordinates
+Wi-Fi functions: scanning, list of networks, connecting to a selected one (must always be connected manually)
+HP and AP indicators are calculated automatically, depending on the time of day. During the day, they decrease. After evening, they replenish.
 
+====== on the main screen ======
+Left corner: 3 states:
+framed - active
+Wi-Fi - WiFi connected
+Rad - music playing
+W weather indicator:
+W Err - no weather data
+W [E] - data read from EEPROM
+W [O] - current data from OpenMeteo
+W [W] - current data from WTTR
 
-* ====== Settings: =========
-  
- Password default for wifi in wifi_module.cpp
+Right (limited to three lines): list of items (configured in general - time)
+Displays the number of minutes left until a certain timer (in minutes, limited to 240)
+Line structure: (minutes remaining) name
 
- Default folder from SD card for mp3 in RadioModule.cpp
- 
- In RadioModule.cpp pin 26 for output audio stream
-
-
-* ====== components =========
- 
- * CYD: 2.4 inch ESP32-2432S024R with Resistive touch (Only type-c usb connector, RGB led in Front near display. )
- * RTC + EEPROM :   Tyni RTC I2C module DS1307 with EEPROM
- * connectors:
- 
-    JST 1.25 4pin - for i2c bus
-
-    JST 1.25 2pin (2 pcs)  - for dinamic and battery
-   
- Для работы часов нужен модульс флэшкой памяти (на модуле должно быть две 8 ногих микросхемы)/ либо флэшка памяти отдельно i2c
- 
-
- * Dinamic динамик ( можно от мобильника, например с старых айфонов)
- * модуль сенсора пульса (опционально) пока не реализовано
- * флэшка microSD (до 32 гб, чем меньше тем лучше. оптимально - 8 гб) FAT32. С нее считывается музыка локально. Радиостанции из фалаут можно найти отдельно.
-
-
-======= настройки и работа ======
-
-пароль вай вай запоминает последний введенный,
-
-координаты GPS и выбор температры( Celsius - Farengheit) запоминает последние введенные
-
-папку с MP3 файлами так же запоминает введенную (по умолчанию SD:/mp3/)
-
-====== на главном экране ======
-* слева в углу 3 состояния:
- в рамке - активно
- * wifi - подключен ли WiFi
- * Rad - идет ли воспроизведение музыки
- * W индикатор погоды:
-   W Err - данных о погоде нет
-   
-   W [E] - данные считанные из EEPROM
-   
-   W [O] - Данные актуальные из OpenMeteo
-   
-   W [W] - Данные актуальные из WTTR
-
-
-HP - индикатор пульса (not realize)
-
-HP - зависит от времени суток (с 8 утра до 8 вечера уменьшается с 420 до 80) Потом восстанавливается до максимума к 03:00
-
-AP - зависит от времени суток (с 8 утра до 13:00 уменьшается до 60, потом до 5:00 уменьшается до 30.
- Потом с 5:00 до 5:30 уменьшается до 0 каждую минуту отнимаеся 1) Потом восстанавливается до максимума каждые 5 минут.
-
-
-
-
+HP - heart rate indicator
+HP - depends on the time of day (from 8 AM to 8 PM it decreases from 420 to 80). It then returns to its maximum at 3:00 AM
+AP - depends on the time of day (from 8 AM to 1 PM it decreases to 60, then decreases to 30 by 5:00 AM). Then from 5:00 to 5:30 it decreases to 0 every minute by 1) Then it is restored to the maximum every 5 minutes.
