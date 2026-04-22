@@ -76,12 +76,8 @@
 
 
 // Координаты по умолчанию для погоды (Москва)
-//#define DEFAULT_LAT "55.7558"
-//#define DEFAULT_LON "37.6173"
-
-#define DEFAULT_LAT "55.594996"
-#define DEFAULT_LON "38.121188"
-
+#define DEFAULT_LAT "55.7558"
+#define DEFAULT_LON "37.6173"
 
 // ======================= UI =======================
 #define TAB_Y 205
