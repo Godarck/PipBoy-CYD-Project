@@ -2,7 +2,7 @@
   
 * Stylized Pip-Boy from Fallout
 
-  ![image](https://github.com/Godarck/PipBoy-CYD-Project/blob/main/Photo/IMG_20260422_122215.jpg)
+  ![image](https://github.com/Godarck/PipBoy-CYD-Project/blob/main/Photo/IMG_20260422_122215.png)
   
 
 * ARDUINO IDE PREFERENCES:
