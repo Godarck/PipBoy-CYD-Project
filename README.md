@@ -54,7 +54,7 @@ Speaker (can be from a mobile phone, for example, from old iPhones)
 
 Heart rate sensor module (optional) not yet implemented
 
-MicroSD flash card (up to 32 GB, the smaller the better. 8 GB is optimal) FAT32. Music is read from it locally. Fallout radio stations can be found separately.
+MicroSD flash card (up to 32 GB, the smaller is the better. 8 GB is optimal) FAT32. Music is read from it locally. Fallout radio stations can be found separately.
 
 
 * ======= Features ======
