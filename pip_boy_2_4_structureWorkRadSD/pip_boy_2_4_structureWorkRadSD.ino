@@ -2,6 +2,7 @@
  * ESP32 2.4" TFT ILI9341 + XPT2046 Touch + RTC DS1307 + AT24C32 EEPROM + WiFi
  * Стилизованный Pip-Boy из Fallout
 
+ARDUINO IDE PREFERENCES:
 Flash mod: DIO
 partition scheme: NoOta 2mb APP / 2mb SPIFFS
 events run: core1
@@ -128,6 +129,18 @@ struct BackUpDataFolder {
   char SDFolder[32];           // 32 байт
 } __attribute__((packed));   // <-- БЕЗ ПАДДИНГА!
 
+struct BackUpTimers {
+  char T1Name[8]; // 8 байт
+  char T2Name[8]; 
+  char T3Name[8];  
+  uint8_t T1hour;
+  uint8_t T2hour;
+  uint8_t T3hour;
+  uint8_t T1min;
+  uint8_t T2min;
+  uint8_t T3min;   
+} __attribute__((packed));   // <-- БЕЗ ПАДДИНГА!
+
 // Калибровка тачскрина (rotation 1)
 uint16_t calData[5] = { 294, 3577, 349, 3453, 0 };
 
@@ -146,6 +159,13 @@ int timeY = 40; // Позиция часов на экране
 
 int prevDay = 0;
 
+// переменные таймеров
+bool timeSettingsActive = false;
+uint8_t T1h = 13, T1m = 00, T2h = 17, T2m = 30, T3h = 23, T3m = 00;
+String T1S = "Food", T2S = "Stimpack",  T3S = "";
+String EditFieldFlag = "";
+uint8_t parsedHours = 99;
+uint8_t parsedMinutes = 99;
 
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite sprite = TFT_eSprite(&tft);
@@ -192,14 +212,18 @@ SPIClass SDSPI(VSPI);
 /*-------- DEBUGGING ----------*/
 void Debug(String label, uint8_t val)
 {
-  Serial.print(label);
-  Serial.print("=");
-  Serial.println(val);
+  if (DEBUGFLAG) 
+  {
+    Serial.print(label);
+    Serial.print("=");
+    Serial.println(val);
+  }
 }
 
 // ======================= ПРОТОТИПЫ ФУНКЦИЙ =======================
 void initI2C();
 bool LoadBackUpFromEPPR();
+bool SaveBackUpToEPPR();
 void initStartUp();
 void drawWindArrow();
 void drawScanlines();
@@ -213,6 +237,21 @@ void drawButtonsScreen4();
 void drawRadioSetButtons();
 void updateHPAP();
 void UpdateRightPanel();
+bool parseTime(const char* input);
+void sanitizeTimeInput(char* input);
+bool isValidString(const String& str);
+
+///General Setup Screen
+
+void HandleButtonsScreen4(uint16_t x, uint16_t y);
+void drawRadioSettings();
+void drawTimeSettings();
+void handleWiFiTouch(uint16_t x, uint16_t y);
+void handleRadioSettingsTouch(uint16_t x, uint16_t y);
+void HandleTimeSettings(uint16_t x, uint16_t y);
+void handleWeatherSettingsTouch(uint16_t x, uint16_t y);
+void drawWeatherSettings();
+
 
 void drawTabButtons();
 void drawStatusButton(bool active);
@@ -223,11 +262,9 @@ void drawGeneralButton(bool active);
 void drawVaultBoy(int16_t cx, int16_t cy, int8_t frame);
 void updateWeatherTimeDisplay();
 void drawWiFiScreen();
-void HandleButtonsScreen4(uint16_t x, uint16_t y);
 void scanWiFiNetworks();
 void connectToWiFi(const char* ssid, const char* password);
-void drawWeatherSettings();
-void handleWeatherSettingsTouch(uint16_t x, uint16_t y);
+
 
 // Клавиатура
 void initKeyboard();
@@ -262,8 +299,7 @@ void drawCurrentWeatherIconCentered(int x, int y, uint16_t color);
 
 // radio
 // Прототипы (добавь в раздел ПРОТОТИПЫ ФУНКЦИЙ
-void drawRadioSettings();
-void handleRadioSettingsTouch(uint16_t x, uint16_t y);
+void handleRadioSetButtons(uint16_t x, uint16_t y);
 bool checkSDPath(const char* path);
 void radioSetSDFolder(const String& folder);
 int  radioScanSDFolder();
@@ -289,13 +325,11 @@ int radioGetStationIndex();
 //bool radioHasTimeout();
 //bool radioHasInvalidFormat();
 void UpdateMetaData();
-void handleRadioSetButtons(uint16_t x, uint16_t y);
 
 // WiFi
 void wifiInit();
 void scanWiFiNetworks();
 void drawWiFiScreen();
-void handleWiFiTouch(uint16_t x, uint16_t y);
 void connectToWiFi(const char* ssid, const char* password);
 void wifiDisconnect();
 bool wifiIsConnected();
@@ -305,7 +339,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   
-  Serial.println("Pip-Boy starting...");
+  if (DEBUGFLAG) Serial.println("Pip-Boy starting...");
   
 /*
   pinMode(SD_CS, OUTPUT);
@@ -321,15 +355,15 @@ void setup() {
   //SD.begin(5, SDSPI);
   if (SD.begin(SD_CS, SDSPI, 1000000)) {                // CS = IO5 (по твоей схеме)
     sdCardInitialized = true;
-    Serial.println("SD Card Initialized 1MHz");
+    if (DEBUGFLAG) Serial.println("SD Card Initialized 1MHz");
   } else if (SD.begin(SD_CS, SDSPI, 2000000))
   {                
     sdCardInitialized = true;
-    Serial.println("SD Card Initialized 2MHz");
+    if (DEBUGFLAG) Serial.println("SD Card Initialized 2MHz");
   }
   else {
     sdCardInitialized = false;
-    Serial.println("SD Card mount failed ERROR");
+    if (DEBUGFLAG) Serial.println("SD Card mount failed ERROR");
   }
 
   if (sdCardInitialized)
@@ -337,22 +371,22 @@ void setup() {
       uint8_t cardType = SD.cardType();
 
       if (cardType == CARD_NONE) {
-        Serial.println("No SD card attached");
+        if (DEBUGFLAG) Serial.println("No SD card attached");
         return;
       }
-        Serial.print("SD Card Type: ");
+        if (DEBUGFLAG) Serial.print("SD Card Type: ");
   if (cardType == CARD_MMC) {
-    Serial.println("MMC");
+    if (DEBUGFLAG) Serial.println("MMC");
   } else if (cardType == CARD_SD) {
-    Serial.println("SDSC");
+    if (DEBUGFLAG) Serial.println("SDSC");
   } else if (cardType == CARD_SDHC) {
-    Serial.println("SDHC");
+    if (DEBUGFLAG) Serial.println("SDHC");
   } else {
-    Serial.println("UNKNOWN");
+    if (DEBUGFLAG) Serial.println("UNKNOWN");
   }
 
   uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-  Serial.printf("SD Card Size: %lluMB\n", cardSize);
+  if (DEBUGFLAG) Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
   }
   
@@ -409,7 +443,7 @@ void setup() {
   drawPipBoyScreen();
   drawTabButtons();
   
-  Serial.println("Pip-Boy ready!");
+  if (DEBUGFLAG) Serial.println("Pip-Boy ready!");
 }
 
 // ======================= LOOP =======================
@@ -506,7 +540,7 @@ void loop() {
     if (currentScreen == 2)
     {
        
-        Serial.println("Radio screen working..");
+        if (DEBUGFLAG) Serial.println("Radio screen working..");
         UpdateMetaData();
     }
       
@@ -599,7 +633,45 @@ void loop() {
       drawWeatherSettings();
     }
     
-    
+    if (timeSettingsActive)
+    {
+      const char* inputTimeField = getKeyboardInput();
+      String EditFieldTimer = String(inputTimeField).substring(0, 8);
+      //memcpy(EditFieldTimer, inputTimeField, 32);
+      if (EditFieldTimer)
+        if (EditFieldFlag == "T1S") T1S = EditFieldTimer; 
+        if (EditFieldFlag == "T2S") T2S = EditFieldTimer;
+        if (EditFieldFlag == "T3S") T3S = EditFieldTimer;
+
+        if (EditFieldFlag == "T1h"){
+          if (parseTime(inputTimeField)) {
+            T1h = parsedHours;
+            if (parsedMinutes != 99) T1m = parsedMinutes;
+          }
+         }
+        if (EditFieldFlag == "T2h"){
+          if (parseTime(inputTimeField)) {
+            T2h = parsedHours;
+            if (parsedMinutes != 99) T2m = parsedMinutes;
+          }
+         }
+        if (EditFieldFlag == "T3h"){
+          if (parseTime(inputTimeField)) {
+            T3h = parsedHours;
+            if (parsedMinutes != 99) T3m = parsedMinutes;
+          }
+         }
+        if (EditFieldFlag == "T1m") 
+          if (parseTime(inputTimeField)) T1m = parsedMinutes;
+        if (EditFieldFlag == "T2m") 
+          if (parseTime(inputTimeField)) T2m = parsedMinutes;
+        if (EditFieldFlag == "T3m") 
+          if (parseTime(inputTimeField)) T3m = parsedMinutes;
+
+       //if  parseTime();
+       EditFieldFlag= "";
+      drawTimeSettings();
+    }
   
     if (radioSettingsActive) {
       const char* input = getKeyboardInput();
@@ -766,6 +838,7 @@ void initStartUp(){
       tft.print("BACKUP LOAD -------------- ");
       tft.setTextColor(TFT_RED);
       tft.println("ERROR");
+      SaveBackUpToEPPR();
     }
   }
   else
@@ -849,12 +922,13 @@ bool LoadBackUpFromEPPR()
 BackUpDataGPS dataG;
 BackUpDataWiFi dataW;
 BackUpDataFolder dataF;
+BackUpTimers dataTS;
 
 bool ErrorB = false;
   // Очистка перед чтением
   memset(&dataG, 0, sizeof(BackUpDataGPS));
   if (!eepromReadSlot(1, (uint8_t*)&dataG)) {
-    Serial.println("[EEPROM] read slot backup GPS ---- failed");
+    if (DEBUGFLAG) Serial.println("[EEPROM] read slot backup GPS ---- failed");
     //return false;
     ErrorB = true;
   }
@@ -867,7 +941,7 @@ bool ErrorB = false;
 
   memset(&dataW, 0, sizeof(BackUpDataWiFi));
   if (!eepromReadSlot(2, (uint8_t*)&dataW)) {
-    Serial.println("[EEPROM] read slot backup wifi pass ---- failed");
+    if (DEBUGFLAG) Serial.println("[EEPROM] read slot backup wifi pass ---- failed");
     ErrorB = true;
   }
   else
@@ -880,7 +954,7 @@ bool ErrorB = false;
 
   memset(&dataF, 0, sizeof(BackUpDataFolder));
   if (!eepromReadSlot(3, (uint8_t*)&dataF)) {
-    Serial.println("[EEPROM] read slot backup MP3 folder ---- failed");
+    if (DEBUGFLAG) Serial.println("[EEPROM] read slot backup MP3 folder ---- failed");
     ErrorB = true;
   }
   else
@@ -890,15 +964,42 @@ bool ErrorB = false;
   }
 
 
+  memset(&dataTS, 0, sizeof(BackUpTimers));
+  if (!eepromReadSlot(4, (uint8_t*)&dataTS)) {
+    if (DEBUGFLAG) Serial.println("[EEPROM] read slot backup Timers ---- failed");
+    ErrorB = true;
+  }
+  else
+  {  
+    char buf[9];
+    memset(buf, 0, sizeof(buf));
+    memcpy(buf,dataTS.T1Name, 8);
+    buf[9] = '\0';
+    T1S = String(buf);
+    memset(buf, 0, sizeof(buf));
+    memcpy(buf,dataTS.T2Name, 8);
+    T2S = String(buf);
+    memset(buf, 0, sizeof(buf));
+    memcpy(buf,dataTS.T3Name, 8);
+    T3S = String(buf);
+
+    T1h = dataTS.T1hour;
+    T1h = dataTS.T1hour;
+    T1h = dataTS.T1hour;
+
+    T1m = dataTS.T1min;
+    T2m = dataTS.T2min;
+    T3m = dataTS.T3min;
+  }
 
   if (ErrorB)
   {
-    Serial.printf("\n[EEPROM] read slot TOTAL backup --- FAILED:\n\nCurrent values:\n GPS: %s , %s\n WiFi Pass: %s\n MP3 folder:%s\n\n", weatherLat, weatherLon, StandartWiFiPass, radioSDFolder);
+    if (DEBUGFLAG) Serial.printf("\n[EEPROM] read slot TOTAL backup --- FAILED:\n\nCurrent values:\n GPS: %s , %s\n WiFi Pass: %s\n MP3 folder:%s\n\n", weatherLat, weatherLon, StandartWiFiPass, radioSDFolder);
     return false;
   }
   else
   {
-  Serial.printf("\n[EEPROM] read slot backup --- OK:\n GPS: %s , %s\n WiFi Pass: %s\n MP3 folder:%s\n", weatherLat, weatherLon, StandartWiFiPass, radioSDFolder);
+  if (DEBUGFLAG) Serial.printf("\n[EEPROM] read slot backup --- OK:\n GPS: %s , %s\n WiFi Pass: %s\n MP3 folder:%s\n", weatherLat, weatherLon, StandartWiFiPass, radioSDFolder);
     return true;
   }
 }
@@ -908,8 +1009,9 @@ bool SaveBackUpToEPPR()
 BackUpDataGPS dataG;
 BackUpDataWiFi dataW;
 BackUpDataFolder dataF;
-
+BackUpTimers dataTS;
   // Очистка всей структуры перед использованием!
+  // Weather settings
   memset(&dataG, 0, sizeof(BackUpDataGPS));
 
   strncpy(dataG.GPS_LAT, weatherLat.c_str(),  sizeof(dataG.GPS_LAT) - 1);
@@ -920,27 +1022,50 @@ BackUpDataFolder dataF;
 
   if (weatherCelsius) dataG.icCels = 1; else dataG.icCels = 0;
   if (eepromWriteSlot(1, (uint8_t*)&dataG)) {
-    Serial.printf("GPS saved to EEPROM: Lat: %s, Lon: %s, Celsius(1 - yes): %d\n", dataG.GPS_LAT ,dataG.GPS_LON, dataG.icCels);
+    if (DEBUGFLAG) Serial.printf("GPS saved to EEPROM: Lat: %s, Lon: %s, Celsius(1 - yes): %d\n", dataG.GPS_LAT ,dataG.GPS_LON, dataG.icCels);
   }
   else 
     return false;
-
+/// WiFi pass
   memset(&dataW, 0, sizeof(BackUpDataWiFi));
   strncpy(dataW.WiFi_Pass, StandartWiFiPass, sizeof(dataW.WiFi_Pass) - 1);
   dataW.WiFi_Pass[sizeof(dataW.WiFi_Pass)-1] = '\0';
 
   if (eepromWriteSlot(2, (uint8_t*)&dataW)) {
-    Serial.printf("Wifi pass saved to EEPROM: %s\n", dataW.WiFi_Pass);
+    if (DEBUGFLAG) Serial.printf("Wifi pass saved to EEPROM: %s\n", dataW.WiFi_Pass);
   }
   else 
     return false;
-
+// MP3 Folder
   memset(&dataF, 0, sizeof(BackUpDataFolder));
   strncpy(dataF.SDFolder, radioSDFolder.c_str(), sizeof(dataF.SDFolder) - 1);
   dataF.SDFolder[sizeof(dataF.SDFolder)-1] = '\0';
 
   if (eepromWriteSlot(3, (uint8_t*)&dataF)) {
-    Serial.printf("MP3 folder saved to EEPROM: %s\n", dataF.SDFolder);
+    if (DEBUGFLAG) Serial.printf("MP3 folder saved to EEPROM: %s\n", dataF.SDFolder);
+  }
+  else 
+    return false;
+
+/// Timers
+  memset(&dataTS, 0, sizeof(BackUpTimers));
+
+  strncpy(dataTS.T1Name, T1S.c_str(),  sizeof(dataTS.T1Name));
+  
+  strncpy(dataTS.T2Name, T2S.c_str(),  sizeof(dataTS.T2Name));
+
+  strncpy(dataTS.T3Name, T3S.c_str(),  sizeof(dataTS.T3Name));
+
+  dataTS.T1hour = T1h;
+  dataTS.T2hour = T2h;
+  dataTS.T3hour = T3h;
+
+  dataTS.T1min = T1m;
+  dataTS.T2min = T2m;
+  dataTS.T3min = T3m;
+
+  if (eepromWriteSlot(4, (uint8_t*)&dataTS)) {
+    if (DEBUGFLAG) Serial.printf("Timers saved to EEPROM:\n  %s %d:%d\n  %s %d:%d\n  %s %d:%d\n\n", dataTS.T1Name ,dataTS.T1hour, dataTS.T1min, dataTS.T2Name ,dataTS.T2hour, dataTS.T2min, dataTS.T3Name ,dataTS.T3hour, dataTS.T3min);
   }
   else 
     return false;
@@ -1010,7 +1135,10 @@ void handleTouch(uint16_t x, uint16_t y) {
         handleWeatherSettingsTouch(x, y);
       } else if (radioSettingsActive) {
         handleRadioSettingsTouch(x, y);
-      } else {    
+      } else if (timeSettingsActive) {  
+        HandleTimeSettings(x,y);
+      } else
+      {  
         if (ButtonScreen2 == 1)
           handleWiFiTouch(x, y);
       }
@@ -1072,8 +1200,11 @@ void drawVaultBoy(int16_t cx, int16_t cy, int8_t frame) {
   tft.setTextDatum(MC_DATUM);
   tft.setCursor(bitmapStartX, 185);
   tft.print("SAM - Level ");
-  tft.print(frame);
+  tft.print(frame + 1);
+  updateLevel(frame + 1);
 }
+
+
 
 void drawPipBoyScreen() {
   tft.fillScreen(TFT_BLACK);
@@ -1520,7 +1651,7 @@ void drawPipBoyScreen3() {
   tft.drawString(tempDisplay, 160, 40);
   int Widthstr = tft.textWidth(tempDisplay);
 
-    Serial.printf("Text width temp: %d\n", Widthstr);
+  if (DEBUGFLAG) Serial.printf("Text width temp: %d\n", Widthstr);
   tft.drawCircle((320/2) + (Widthstr/2) - 50 , 45, 6, TFT_GREEN);
   tft.drawCircle((320/2) + (Widthstr/2) - 50, 45, 5, TFT_GREEN);
   tft.drawCircle((320/2) + (Widthstr/2) - 50, 45, 4, TFT_GREEN);
@@ -1583,7 +1714,7 @@ void updateWeatherTimeDisplay() {
     if (weatherLastUpdate())
     {
       time_t dateUpW = weatherLastUpdate();
-      stringw = String(day(dateUpW)) + "." + String(month(dateUpW)) + "." + String(year(dateUpW)) + " " + String(hour(dateUpW)) + ":" + String(minute(dateUpW));
+      stringw = pad2(day(dateUpW)) + "." + pad2(month(dateUpW)) + "." + String(year(dateUpW)) + " " + pad2(hour(dateUpW)) + ":" + pad2(minute(dateUpW));
     }
     else
     {
@@ -1748,20 +1879,25 @@ void HandleButtonsScreen4(uint16_t xTouch, uint16_t yTouch) {
       case 1:
         weatherSettingsActive = false;
         radioSettingsActive = false;
+        timeSettingsActive = false;
         drawWiFiScreen();
         break;
       case 2:
         weatherSettingsActive = false;
         radioSettingsActive = true;
+        timeSettingsActive = false;
         drawRadioSettings();
         break;
       case 3:
         weatherSettingsActive = false;
         radioSettingsActive = false;
+        timeSettingsActive = true;
+        drawTimeSettings();
         break; 
       case 4:
         weatherSettingsActive = true;
         radioSettingsActive = false;
+        timeSettingsActive = false;
         drawWeatherSettings();
         break;
     }
@@ -1843,13 +1979,13 @@ void drawWeatherSettings() {
   if (weatherLastUpdate())
   {
     time_t dateUpW = weatherLastUpdate();
-    String stringw = "Last update: " + String(day(dateUpW)) + "." + String(month(dateUpW)) + "." + String(year(dateUpW)) + " " + String(hour(dateUpW)) + ":" + String(minute(dateUpW));
+    String stringw = "Last update: " + pad2(day(dateUpW)) + "." + pad2(month(dateUpW)) + "." + String(year(dateUpW)) + " " + pad2(hour(dateUpW)) + ":" + pad2(minute(dateUpW));
     tft.drawString(stringw, LIST_X + (320 - LIST_X - 5)/2 , 180);
   }
 }
 
 void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
-  if (x < LIST_X || x > LIST_X + LIST_W || y < LIST_Y || y > LIST_Y + LIST_H) {
+  if (x < LIST_X || x > 320 - 5 || y < LIST_Y || y > 10 + 186) {
     return;
   }
   
@@ -1944,11 +2080,11 @@ bool isValidPath(const String& path) {
 
 bool checkSDPath(const char* path) {
   if (!sdCardInitialized) {
-    Serial.println("[checkSDPath] SD not initialized");
+    if (DEBUGFLAG) Serial.println("[checkSDPath] SD not initialized");
     return false;
   }
-  if (!path || strlen(path) < 2) {
-    Serial.println("[checkSDPath] Path too short");
+  if (!path || strlen(path) < 1) {
+    if (DEBUGFLAG) Serial.println("[checkSDPath] Path too short");
     return false;
   }
 
@@ -1956,7 +2092,7 @@ bool checkSDPath(const char* path) {
   
   // Сначала проверяем формат пути
   if (!isValidPath(p)) {
-    Serial.println("[checkSDPath] Invalid path format");
+    if (DEBUGFLAG) Serial.println("[checkSDPath] Invalid path format");
     return false;
   }
 
@@ -1965,7 +2101,7 @@ bool checkSDPath(const char* path) {
   if (checking) return false;
   checking = true;
 
-  Serial.printf("[checkSDPath] Testing: '%s'\n", path);
+  if (DEBUGFLAG) Serial.printf("[checkSDPath] Testing: '%s'\n", path);
 
   //digitalWrite(5, LOW);
  // delay(10);
@@ -1977,12 +2113,138 @@ bool checkSDPath(const char* path) {
   //digitalWrite(5, HIGH);
   checking = false;
 
-  Serial.printf("[checkSDPath] Result: %s\n", ok ? "VALID DIRECTORY" : "NOT FOUND / NOT DIRECTORY");
+  if (DEBUGFLAG) Serial.printf("[checkSDPath] Result: %s\n", ok ? "VALID DIRECTORY" : "NOT FOUND / NOT DIRECTORY");
   return ok;
 }
 
+void drawTimeSettings()
+{
+  timeSettingsActive = true;
+  tft.fillRect(LIST_X, 10, 320 - LIST_X - 5, 186, TFT_BLACK);
+  tft.drawRect(LIST_X, 10, 320 - LIST_X - 5, 186, TFT_GREEN);
+
+  tft.setTextColor(TFT_GREEN);
+  tft.setTextSize(2);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString("TIMER SETTINGS", LIST_X + (320 - LIST_X - 5)/2, 15);
+  tft.setTextSize(1);
+
+      tft.setCursor(LIST_X + 10, 110);
+      
+      int fieldX = LIST_X + 10, fieldY = 35, fieldW = 100, fieldH = 20, feldPad = 5;
+
+      for (int i = 1; i <= 3; i++)
+      {
+        tft.fillRect(fieldX, fieldY + (fieldH * (i-1)) + feldPad*(i-1), fieldW, fieldH, TFT_BLACK);
+        tft.drawRect(fieldX, fieldY + (fieldH * (i-1)) + feldPad*(i-1), fieldW, fieldH, TFT_GREEN);
+        tft.setCursor(fieldX + 5, fieldY + (fieldH * (i-1)) + feldPad*(i-1) +5);
+         switch(i) {
+            case 1: tft.print(T1S); break;
+            case 2: tft.print(T2S); break;
+            case 3: tft.print(T3S); break;
+         }
+        tft.setCursor(fieldX + fieldW + feldPad + 10, fieldY + (fieldH * (i-1)) + feldPad*(i-1) + 5);
+        tft.print("Time:");
+        tft.fillRect(fieldX + 40 + fieldW + feldPad, fieldY + (fieldH * (i-1)) + feldPad*(i-1), 25, fieldH, TFT_BLACK);
+        tft.drawRect(fieldX + 40 + fieldW + feldPad, fieldY + (fieldH * (i-1)) + feldPad*(i-1), 25, fieldH, TFT_GREEN);
+        tft.setCursor(fieldX + 40 + fieldW + feldPad + 5, fieldY + (fieldH * (i-1)) + feldPad*(i-1) + 5);
+        switch(i) {
+            case 1: tft.printf("%02u", T1h); break;
+            case 2: tft.printf("%02u",T2h); break;
+            case 3: tft.printf("%02u",T3h); break;
+         }
+        tft.fillRect(fieldX + 40 + fieldW + feldPad*2 + 25, fieldY + (fieldH * (i-1)) + feldPad*(i-1), 25, fieldH, TFT_BLACK);
+        tft.drawRect(fieldX + 40 + fieldW + feldPad*2 + 25, fieldY + (fieldH * (i-1)) + feldPad*(i-1), 25, fieldH, TFT_GREEN);
+        tft.setCursor(fieldX + 40 + fieldW + feldPad*2 + 25 + 5, fieldY + (fieldH * (i-1)) + feldPad*(i-1) + 5);
+        switch(i) {
+            case 1: tft.printf("%02u",T1m); break;
+            case 2: tft.printf("%02u",T2m); break;
+            case 3: tft.printf("%02u",T3m); break;
+         }
+      }
 
 
+  // SAVE / CANCEL
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_GREEN);
+  tft.fillRect(LIST_X + (320 - LIST_X - 5)/2 - 65, 150, 60, 25, TFT_BLACK);
+  tft.drawRect(LIST_X + (320 - LIST_X - 5)/2 - 65, 150, 60, 25, TFT_GREEN);
+  tft.drawString("SAVE", LIST_X + ((320 - LIST_X - 5)/2 - 35), 163);
+
+  tft.fillRect(LIST_X + (320 - LIST_X - 5)/2 + 5, 150, 60, 25, TFT_BLACK);
+  tft.drawRect(LIST_X + (320 - LIST_X - 5)/2 + 5, 150, 60, 25, TFT_GREEN);
+  tft.drawString("CANCEL", LIST_X + ((320 - LIST_X - 5)/2 + 35), 163);
+}
+
+
+void HandleTimeSettings(uint16_t x, uint16_t y)
+{
+
+  if (x < LIST_X || x > 320 - 5 || y < 10 || y > 10 + 186) return;
+
+  if (timeSettingsActive)
+  {
+     int fieldX = LIST_X + 10, fieldY = 35, fieldW = 100, fieldH = 20, feldPad = 5;
+      //if (DEBUGFLAG)  Serial.print("Touch in screen. Field value:");
+   for (int i = 1; i <= 3; i++)
+      {
+          if (x >= fieldX && x <= fieldX + fieldW && y >= fieldY + (fieldH * (i-1)) + feldPad*(i-1) && y <= fieldY + (fieldH * (i-1)) + feldPad*(i-1) + fieldH) {
+          digitalWrite(LED_B, LOW); delay(30); digitalWrite(LED_B, HIGH);
+          
+          switch(i) {
+            case 1: EditFieldFlag = "T1S"; showKeyboard(T1S.c_str()); break; 
+            case 2: EditFieldFlag = "T2S"; showKeyboard(T2S.c_str()); break; 
+            case 3: EditFieldFlag = "T3S"; showKeyboard(T3S.c_str()); break; 
+            }
+          return;
+          }
+
+          if (x >= fieldX + 40 + fieldW + feldPad && x <= fieldX + 40 + fieldW + feldPad + 25 && y >= fieldY + (fieldH * (i-1)) + feldPad*(i-1) && y <= fieldY + (fieldH * (i-1)) + feldPad*(i-1) + fieldH) {
+          digitalWrite(LED_B, LOW); delay(30); digitalWrite(LED_B, HIGH);         
+          switch(i) {
+            case 1: EditFieldFlag = "T1h"; showKeyboard(String(T1h).c_str()); break; 
+            case 2: EditFieldFlag = "T2h"; showKeyboard(String(T2h).c_str()); break;
+            case 3: EditFieldFlag = "T3h"; showKeyboard(String(T3h).c_str()); break; 
+            }
+          return;
+          }
+
+          if (x >= fieldX + 40 + fieldW + feldPad * 2 + 25 && x <= fieldX + 40 + fieldW + feldPad * 2 + 55 && y >= fieldY + (fieldH * (i-1)) + feldPad*(i-1) && y <= fieldY + (fieldH * (i-1)) + feldPad*(i-1) + fieldH) {
+          digitalWrite(LED_B, LOW); delay(30); digitalWrite(LED_B, HIGH);
+          switch(i) {
+            case 1: EditFieldFlag = "T1m"; showKeyboard(String(T1m).c_str()); break; 
+            case 2: EditFieldFlag = "T2m"; showKeyboard(String(T2m).c_str()); break; 
+            case 3: EditFieldFlag = "T3m"; showKeyboard(String(T3m).c_str()); break;
+            }
+          return;
+          }
+    
+      }
+
+      // SAVE
+  if (x >= LIST_X + (320 - LIST_X - 5)/2 - 65 && x <= LIST_X + (320 - LIST_X - 5)/2 - 5 && y >= 150 && y <= 175) {
+    digitalWrite(LED_G, LOW); delay(30); digitalWrite(LED_G, HIGH);
+    radioSettingsActive = false;
+    if (radioPlaySource == 0 && checkSDPath(radioSDFolder.c_str())) {
+      SaveBackUpToEPPR();
+      //loadSDPlaylist();   // вызов из radio_module
+    }
+    drawPipBoyScreen4();
+    return;
+  }
+
+  // CANCEL
+  if (x >= LIST_X + (320 - LIST_X - 5)/2 + 5 && x <= LIST_X + (320 - LIST_X - 5)/2 + 65 && y >= 150 && y <= 175) {
+    digitalWrite(LED_R, LOW); delay(30); digitalWrite(LED_R, HIGH);
+    radioSettingsActive = false;
+    drawPipBoyScreen4();
+    return;
+  }
+  
+
+   if (DEBUGFLAG) Serial.println("");
+  }
+}
 
 void drawRadioSettings() {
   radioSettingsActive = true;
@@ -2067,7 +2329,7 @@ void drawRadioSettings() {
 }
 
 void handleRadioSettingsTouch(uint16_t x, uint16_t y) {
-  if (x < LIST_X || x > LIST_X + LIST_W || y < LIST_Y || y > LIST_Y + LIST_H) return;
+  if (x < LIST_X || x > 320 - 5 || y < 10 || y > 10 + 186) return;
 
   int btnY = 60, btnH = 25, btnW = 60;
   int startX = LIST_X + 12;
@@ -2340,6 +2602,16 @@ void drawGeneralButton(bool active) {
   tft.drawString("GENERAL", x + TAB_W/2, TAB_Y + TAB_H/2);
 }
 
+void updateLevel(int8_t frame)
+{
+  tft.setTextColor(TFT_GREEN);
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextSize(1);
+  tft.fillRect(80, 8, 45, 10, TFT_BLACK);
+  drawScanlinesButtons(80, 6, 14, 45);
+  tft.setCursor(80, 10);
+  tft.printf("LVL %d", frame);
+}
 
 void updateHPAP() {
     time_t current = now();
@@ -2386,7 +2658,8 @@ void updateHPAP() {
         if (currentAP > apMax) currentAP = apMax;
     }
 
-    Serial.printf("HP %d/%d AP%d/%d, curr minutes:%d\n", currentHP, hpMax, currentAP, apMax, minutes);
+    if (DEBUGFLAG) Serial.printf("HP %d/%d AP%d/%d, curr minutes:%d\n", currentHP, hpMax, currentAP, apMax, minutes);
+
     if (currentScreen == 0)
     {
       tft.fillRect(132, 8, 320 - 3 - 132, 10, TFT_BLACK);
@@ -2405,6 +2678,7 @@ void updateHPAP() {
         }
     }
 }
+
 
 uint8_t minutesUntil(uint8_t targetH, uint8_t targetM) {
     time_t t = now();
@@ -2431,11 +2705,94 @@ void UpdateRightPanel()
   
       int XstartRight = 240;
       int YstartRight = 45;
-      tft.fillRect(XstartRight, YstartRight, 29, YstartRight * 3, TFT_BLACK);
-      drawScanlinesButtons(XstartRight, YstartRight, YstartRight * 3 + 2, 29);
-      tft.setCursor(XstartRight, YstartRight);
-      tft.printf("(%d)Food", minutesUntil(13,00));
-      tft.setCursor(XstartRight, YstartRight + 20);
-      tft.printf("(%d)Stimpack", minutesUntil(17,30));
+      tft.fillRect(XstartRight, YstartRight - 2, 320-XstartRight, 45, TFT_BLACK);
+      drawScanlinesButtons(XstartRight, YstartRight-2, 46, 320-XstartRight);
+      if (isValidString(T1S)){
+        tft.setCursor(XstartRight, YstartRight);
+        tft.printf("(%d)%s", minutesUntil(T1h,T1m),T1S);
+      }
+      if (isValidString(T2S)){
+        tft.setCursor(XstartRight, YstartRight+16);
+        tft.printf("(%d)%s", minutesUntil(T2h,T2m),T2S);
+      }
+      if (isValidString(T3S)){
+        tft.setCursor(XstartRight, YstartRight+32);
+        tft.printf("(%d)%s", minutesUntil(T3h,T3m),T3S);
+      }
+
 }
 
+
+// Очистка: оставляем только цифры и ':'
+void sanitizeTimeInput(char* input) {
+    int j = 0;
+    for (int i = 0; input[i] != '\0'; i++) {
+        if ((input[i] >= '0' && input[i] <= '9') || input[i] == ':') {
+            input[j++] = input[i];
+        }
+    }
+    input[j] = '\0';
+}
+
+// Парсинг времени по флагу
+bool parseTime(const char* input) {
+    bool parseSuccess = false;
+    
+    if (input == nullptr || input[0] == '\0') return false;
+    char buf[7];
+    strncpy(buf, input, sizeof(buf)-1);
+    buf[sizeof(buf)-1] = '\0';
+
+    sanitizeTimeInput(buf);
+    
+    // --- Режим ЧАСЫ:МИНУТЫ (T1h, T2h, T3h) ---
+    if (EditFieldFlag.endsWith("h")) {
+        char* colon = strchr(buf, ':');
+        
+        if (colon != nullptr) {
+            // Формат ЧЧ:ММ — парсим и часы, и минуты
+            *colon = '\0';
+            int h = atoi(buf);
+            int m = atoi(colon + 1);
+            
+            if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+                parsedHours = (uint8_t)h;
+                parsedMinutes = (uint8_t)m;
+                parseSuccess = true;
+            }
+        } else {
+            // Только часы — минуты НЕ трогаем
+            int h = atoi(buf);
+            if (h >= 0 && h <= 23) {
+                parsedHours = (uint8_t)h;
+                parsedMinutes = 99;
+                parseSuccess = true;
+            }
+        }
+    }
+    // --- Режим МИНУТЫ (T1m, T2m, T3m) ---
+    else if (EditFieldFlag.endsWith("m")) {
+        int m = atoi(buf);
+        if (m >= 0 && m <= 59) {
+            parsedMinutes = (uint8_t)m;
+            parseSuccess = true;
+        }
+    }
+    
+    return parseSuccess;
+}
+
+bool isValidString(const String& str)
+{
+  if (str.length() == 0 ) return false;
+
+  for (size_t i = 0; i < str.length(); i++)
+    if (str[i] != ' ') return true;
+
+  return false;
+}
+
+String pad2(uint8_t val)
+{
+  return (val < 10 ? "0" :"") + String(val);
+}

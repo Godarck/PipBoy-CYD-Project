@@ -20,7 +20,7 @@ static byte packetBuffer[NTP_PACKET_SIZE];
 static unsigned int localPort = 8888;
 
 void debugPrint(const char* label, int value) {
-  #if DEBUG_ENABLED
+  #if DEBUGFLAG
   Serial.print(label);
   Serial.print("=");
   Serial.println(value);
@@ -32,7 +32,7 @@ void rtcInit() {
   
   Wire.beginTransmission(RTC_ADDRESS);
   if (Wire.endTransmission() != 0) {
-    Serial.println("RTC not found!");
+    if (DEBUGFLAG) Serial.println("RTC not found!");
     rtcFound = false;
     return;
   }
@@ -50,7 +50,7 @@ void rtcInit() {
   
   DateTime rtcNow = rtc.now();
   setTime(rtcNow.unixtime());
-  
+  #if DEBUGFLAG
   Serial.print("RTC OK: ");
   Serial.print(rtcNow.year());
   Serial.print("-");
@@ -61,6 +61,7 @@ void rtcInit() {
   Serial.print(rtcNow.hour());
   Serial.print(":");
   Serial.println(rtcNow.minute());
+  #endif
 }
 
 void rtcSyncFromModule() {
@@ -137,7 +138,7 @@ void rtcSyncNtpIfNeeded() {
       lastNtpSync = now();
       ntpSynced = true;
       rtcSaveToModule();
-      Serial.println("NTP sync OK");
+      if (DEBUGFLAG) Serial.println("NTP sync OK");
     }
   }
 }

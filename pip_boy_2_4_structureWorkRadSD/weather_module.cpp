@@ -176,8 +176,8 @@ static int fetchWttr() {
   HTTPClient http;
   String url = "http://wttr.in/" + weatherLat + "," + weatherLon + "?format=%t|%w|%C";
   
-  Serial.print("Wttr: ");
-  Serial.println(url);
+  if (DEBUGFLAG) Serial.print("Wttr: ");
+  if (DEBUGFLAG) Serial.println(url);
   
   http.begin(url);
   http.setTimeout(WEATHER_TIMEOUT_WTTR);
@@ -186,7 +186,7 @@ static int fetchWttr() {
   
   if (code == 200) {
     String payload = http.getString();
-    Serial.println(payload);
+    if (DEBUGFLAG) Serial.println(payload);
     
     int sep1 = payload.indexOf('|');
     int sep2 = payload.indexOf('|', sep1 + 1);
@@ -236,7 +236,7 @@ static int fetchWttr() {
       
       currentWeather.source = WEATHER_PRIMARY;
       currentWeather.lastUpdate = now();
-      Serial.println("Wttr OK");
+      if (DEBUGFLAG) Serial.println("Wttr OK");
     } else {
       code = -100; // Parse error
     }
@@ -251,8 +251,8 @@ static int fetchOpenMeteo() {
   String url = "http://api.open-meteo.com/v1/forecast?latitude=" + 
                weatherLat + "&longitude=" + weatherLon + "&current_weather=true";
   
-  Serial.print("Open-Meteo: ");
-  Serial.println(url);
+  if (DEBUGFLAG) Serial.print("Open-Meteo: ");
+  if (DEBUGFLAG) Serial.println(url);
   
   http.begin(url);
   http.setTimeout(WEATHER_TIMEOUT_OPENMETEO);
@@ -261,7 +261,7 @@ static int fetchOpenMeteo() {
   
   if (code == 200) {
     String payload = http.getString();
-    Serial.println(payload);
+    if (DEBUGFLAG) Serial.println(payload);
 
     StaticJsonDocument<512> doc;
     if (!deserializeJson(doc, payload)) {
@@ -279,7 +279,7 @@ static int fetchOpenMeteo() {
       
       currentWeather.source = WEATHER_OPENMETEO;
       currentWeather.lastUpdate = now();
-      Serial.println("Open-Meteo OK");
+      if (DEBUGFLAG) Serial.println("Open-Meteo OK");
     } else {
       code = -101; // JSON error
     }
@@ -298,14 +298,14 @@ bool weatherLoadFromEEPROM() {
   memset(&data, 0, sizeof(WeatherData));
   
   if (!eepromReadSlot(0, (uint8_t*)&data)) {
-    Serial.println("[EEPROM] read weather slot --- failed");
+    if (DEBUGFLAG) Serial.println("[EEPROM] read weather slot --- failed");
     return false;
   }
   
   // Проверка valid
   if (data.valid != 1) {
-    Serial.print("[WEATHER] weather data in EEPROM invalid, valid=");
-    Serial.println(data.valid);
+    if (DEBUGFLAG) Serial.print("[WEATHER] weather data in EEPROM invalid, valid=");
+    if (DEBUGFLAG) Serial.println(data.valid);
     return false;
   }
   
@@ -317,10 +317,12 @@ bool weatherLoadFromEEPROM() {
   }
   
   if (calc != data.checksum) {
+    #if DEBUGFLAG
     Serial.print("[WEATHER] EEPROM  checksum mismatch: calc=");
     Serial.print(calc);
     Serial.print(" stored=");
     Serial.println(data.checksum);
+    #endif
     return false;
   }
   
@@ -352,13 +354,13 @@ bool weatherLoadFromEEPROM() {
   //if (currentWeather.lastUpdate > millis()) currentWeather.lastUpdate = 0;
   
   currentWeather.source = WEATHER_EEPROM;
-  
+  #if DEBUGFLAG
   Serial.print("[WEATHER] EEPROM loaded OK, Update age =");
   Serial.print(ageSec);
   Serial.println(" sec, ");
   Serial.print(ageSec / 60);
   Serial.println(" min.");
-  
+  #endif
   return true;
 }
 
@@ -398,7 +400,7 @@ void weatherSaveToEEPROM() {
   }
   
   if (eepromWriteSlot(0, (uint8_t*)&data)) {
-    Serial.println("Weather saved to EEPROM");
+   if (DEBUGFLAG)  Serial.println("Weather saved to EEPROM");
   }
 }
 
@@ -419,7 +421,7 @@ void weatherUpdate() {
   
   // Нет WiFi - пробуем EEPROM
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[WEATHER] No WiFi, loading from EEPROM");
+    if (DEBUGFLAG) Serial.println("[WEATHER] No WiFi, loading from EEPROM");
     weatherLoadFromEEPROM();
     return;
   }
@@ -429,9 +431,11 @@ void weatherUpdate() {
   
   // Если ошибка (включая -11 timeout) - пробуем Open-Meteo
   if (result != 200) {
+    #if DEBUGFLAG
     Serial.print("[WEATHER] Wttr failed. Error: ");
     Serial.println(result);
     Serial.println("[WEATHER] Trying Open-Meteo.... ");
+    #endif
     result = fetchOpenMeteo();
   }
   
@@ -440,9 +444,11 @@ void weatherUpdate() {
     weatherSaveToEEPROM();
   } else {
     // Все источники недоступны - загружаем из EEPROM
+    #if DEBUGFLAG
     Serial.print("[WEATHER] OpenMeteo failed. Error: ");
     Serial.println(result);
     Serial.println("[WEATHER] All sources failed, loading EEPROM");
+    #endif
     weatherLoadFromEEPROM();
   }
 }

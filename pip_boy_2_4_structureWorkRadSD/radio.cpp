@@ -94,7 +94,7 @@ static void doStop()
     isPlayingFlag = false;
    // currentTitle[0] = '\0'; currentArtist[0] = '\0';
     snprintf(currentSongInfo, 512, "Stopped");
-    Serial.println("[RADIO] Stopped");
+    if (DEBUGFLAG) Serial.println("[RADIO] Stopped");
 }
 
 static void loadPlaylist(const String& folder)
@@ -112,20 +112,20 @@ static void loadPlaylist(const String& folder)
             String name = f.name();
             if ((name.endsWith(".mp3") || name.endsWith(".MP3")) && (f.size() > 8096)) {
                 sdPlaylist.push_back(name);
-                Serial.printf("[RADIO]  [%d] %s - size:%d\n", n++, name.c_str(), f.size() );
+                if (DEBUGFLAG) Serial.printf("[RADIO]  [%d] %s - size:%d\n", n++, name.c_str(), f.size() );
             }
         }
         f.close(); f = dir.openNextFile();
     }
     dir.close();
     sdPlaylistLoaded = (n > 0);
-    Serial.printf("[RADIO] Playlist: %d tracks\n", n);
+    if (DEBUGFLAG) Serial.printf("[RADIO] Playlist: %d tracks\n", n);
 }
 
 static void startWiFi(int index)
 {
     if (index < 0 || index >= radioStationCount) return;
-    if (WiFi.status() != WL_CONNECTED) { Serial.println("[RADIO] ERR: no WiFi"); return; }
+    if (WiFi.status() != WL_CONNECTED) { if (DEBUGFLAG) Serial.println("[RADIO] ERR: no WiFi"); return; }
     cleanup();
     curStationIdx = index;
     radioPlaySource = 1;
@@ -140,16 +140,16 @@ static void startWiFi(int index)
         isPlayingFlag = true;
         snprintf(currentSongInfo, 512, "%s", radioStations[index].name);
         //UpdateMetaData();
-        Serial.printf("[RADIO] WiFi OK: %s\n", radioStations[index].name);
+        if (DEBUGFLAG) Serial.printf("[RADIO] WiFi OK: %s\n", radioStations[index].name);
     } else {
-        Serial.println("[RADIO] WiFi begin FAILED");
+        if (DEBUGFLAG) Serial.println("[RADIO] WiFi begin FAILED");
         cleanup();
     }
 }
 
 static void startSD(int index)
 {
-    if (!sdCardInitialized || sdPlaylist.empty()) { Serial.println("[RADIO] ERR: SD not ready"); return; }
+    if (!sdCardInitialized || sdPlaylist.empty()) { if (DEBUGFLAG) Serial.println("[RADIO] ERR: SD not ready"); return; }
     if (index < 0 || index >= (int)sdPlaylist.size()) return;
 
     cleanup();
@@ -158,7 +158,7 @@ static void startSD(int index)
     radioPlaySource = 0;
 
     String path = radioSDFolder + "/" + sdPlaylist[index];
-    Serial.printf("[RADIO] SD path: %s\n", path.c_str());
+    if (DEBUGFLAG) Serial.printf("[RADIO] SD path: %s\n", path.c_str());
 
     src = new AudioFileSourceSD(path.c_str());
     
@@ -174,9 +174,9 @@ static void startSD(int index)
         isPlayingFlag = true;
         snprintf(currentSongInfo, 512, "%s", sdPlaylist[index].c_str());
         //UpdateMetaData();
-        Serial.println("[RADIO] SD OK");
+        if (DEBUGFLAG) Serial.println("[RADIO] SD OK");
     } else {
-        Serial.println("[RADIO] SD begin FAILED");
+        if (DEBUGFLAG) Serial.println("[RADIO] SD begin FAILED");
         cleanup();
     }
 }
@@ -207,7 +207,7 @@ static void processCmd(const Cmd& c)
         case CMD_SET_VOL:
             curVolume = constrain(c.value, 0, 100);
             if (out) out->SetGain(curVolume / 100.0);
-            Serial.printf("[RADIO] Vol=%d\n", curVolume);
+            if (DEBUGFLAG) Serial.printf("[RADIO] Vol=%d\n", curVolume);
             break;
     }
 }
@@ -216,7 +216,7 @@ static void processCmd(const Cmd& c)
 
 void radioInit()
 {
-    Serial.println("[RADIO] Init");
+    if (DEBUGFLAG) Serial.println("[RADIO] Init");
     if (!out) {
         out = new AudioOutputI2SNoDAC(RADIO_DAC_PIN);  // ваш вариант с пином в конструкторе
         out->SetGain(0);
@@ -229,7 +229,7 @@ void radioStartTask()
 {
     if (taskHandle) return;
     xTaskCreatePinnedToCore([](void*) {
-        Serial.printf("[RADIO] Task on Core %d\n", xPortGetCoreID());
+        if (DEBUGFLAG) Serial.printf("[RADIO] Task on Core %d\n", xPortGetCoreID());
         Cmd cmd;
         int wifiFail = 0;
 
@@ -263,7 +263,7 @@ void radioStartTask()
                             if (wifiFail > 50) { 
                                 if (!softStopRequested) 
                                 {
-                                    Serial.println("[RADIO] WiFi retry");
+                                    if (DEBUGFLAG) Serial.println("[RADIO] WiFi retry");
                                     startWiFi(curStationIdx);
                                 }
                                 wifiFail = 0; 
@@ -301,7 +301,7 @@ static inline void sendCmd(CmdType t, int v = 0) {
     if (!cmdQueue) return;
     Cmd c = {t, v};
     if (xQueueSend(cmdQueue, &c, pdMS_TO_TICKS(100)) != pdPASS)
-        Serial.println("[RADIO] ERR: queue full");
+        if (DEBUGFLAG) Serial.println("[RADIO] ERR: queue full");
 }
 
 
@@ -314,7 +314,7 @@ static inline void sendCmd(CmdType t, int v = 0) {
 void radioStop() {
     if (isPlayingFlag)
     {
-        Serial.println("[RADIO] Stop (sem)");
+        if (DEBUGFLAG) Serial.println("[RADIO] Stop (sem)");
         //out->SetGain(0);
         isPlayingFlag = false;
         softStopRequested = true;
@@ -339,7 +339,7 @@ void radioSetVolume(uint8_t vol) {
     curVolume = constrain(vol, 0, 100);
     out->SetGain(vol / 100.0); 
     curVolume = vol;
-    Serial.printf("[RADIO] Volume=%d\n", curVolume);
+    if (DEBUGFLAG) Serial.printf("[RADIO] Volume=%d\n", curVolume);
 } //sendCmd(CMD_SET_VOL, vol); }
 
 

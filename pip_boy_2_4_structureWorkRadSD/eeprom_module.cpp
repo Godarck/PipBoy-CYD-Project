@@ -1,4 +1,5 @@
 #include "eeprom_module.h"
+#include "config.h"
 
  bool eepromFound = false;
 
@@ -6,9 +7,9 @@ void eepromInit() {
   Wire.beginTransmission(EEPROM_ADDRESS);
   if (Wire.endTransmission() == 0) {
     eepromFound = true;
-    Serial.println("EEPROM AT24C32 OK");
+    if (DEBUGFLAG) Serial.println("EEPROM AT24C32 OK");
   } else {
-    Serial.println("EEPROM not found");
+    if (DEBUGFLAG) Serial.println("EEPROM not found");
   }
 }
 
@@ -25,13 +26,13 @@ bool eepromWriteSlot(uint8_t slot, uint8_t* data) {
   Wire.write((address >> 8) & 0xFF);
   Wire.write(address & 0xFF);
 
-  Serial.println("Write in EEPROM");
+  if (DEBUGFLAG) Serial.println("Write in EEPROM");
   for (int i = 0; i < 32; i++) {
     Wire.write(data[i]);
-    Serial.print(" ");
-    Serial.print(data[i]);
+    if (DEBUGFLAG) Serial.print(" ");
+    if (DEBUGFLAG) Serial.print(data[i]);
   }
-  Serial.println(" ");
+  if (DEBUGFLAG) Serial.println(" ");
   uint8_t result = Wire.endTransmission();
   delay(10);  // AT24C32 требует 10ms на запись
   
@@ -52,18 +53,18 @@ bool eepromReadSlot(uint8_t slot, uint8_t* buffer) {
   
   uint8_t got = Wire.requestFrom(EEPROM_ADDRESS, 32);
   if (got != 32) {
-    Serial.print("EEPROM read error: got ");
-    Serial.print(got);
-    Serial.println(" bytes instead of 32");
+    if (DEBUGFLAG) Serial.print("EEPROM read error: got ");
+    if (DEBUGFLAG) Serial.print(got);
+    if (DEBUGFLAG) Serial.println(" bytes instead of 32");
     return false;
   }
 
-  Serial.println("READ from EEPROM:");
+  if (DEBUGFLAG) Serial.println("READ from EEPROM:");
   for (int i = 0; i < 32; i++) {
     buffer[i] = Wire.available() ? Wire.read() : 0xFF;
-    Serial.print(buffer[i], HEX);
-    Serial.print(" ");
-    if ((i + 1) % 16 == 0) Serial.println();
+    if (DEBUGFLAG) Serial.print(buffer[i], HEX);
+    if (DEBUGFLAG) Serial.print(" ");
+    if ((i + 1) % 16 == 0) if (DEBUGFLAG) Serial.println();
   }
   bool isEmpty = true;
   for (int i = 0; i < 32; i++) {
@@ -73,7 +74,7 @@ bool eepromReadSlot(uint8_t slot, uint8_t* buffer) {
       break;
     }
   }
-    Serial.println();
+    if (DEBUGFLAG) Serial.println();
   if (isEmpty)
     return false;
 

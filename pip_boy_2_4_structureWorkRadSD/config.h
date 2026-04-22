@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+
+#define DEBUGFLAG true
 // ======================= TFT ПИНЫ (2.4 CYD Type C) =======================
 // edit UserSetup.h in TFT_eSPI library
 #define ILI9341_2_DRIVER
@@ -103,7 +105,7 @@
 #define MAX_NETWORKS 15
 
 // ======================= DEBUG =======================
-#define DEBUG_ENABLED true
+//#define DEBUG_ENABLED true
 void debugPrint(const char* label, int value);
 void debugPrint(const char* label, const char* value);
 
