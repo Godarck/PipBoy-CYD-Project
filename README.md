@@ -59,7 +59,7 @@ MicroSD flash card (up to 32 GB, the smaller the better. 8 GB is optimal) FAT32.
 
 * ======= Features ======
 
-Integrated I2C scanner in start up initilize.
+Integrated I2C scanner in start up initialize.
 
 Wi-Fi password remembers the last entered one,
 
