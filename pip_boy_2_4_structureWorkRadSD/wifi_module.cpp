@@ -298,7 +298,7 @@ void connectToWiFi(const char* ssid, const char* password) {
     tft.drawRect(40, 80, 240, 80, TFT_GREEN);
     tft.setTextColor(TFT_GREEN);
     tft.drawString("CONNECTED!", 160, 100);
-    if (DEBUGFLAG) Serial.printf("[WiFi] Connected. IP:%s\n", WiFi.localIP().toString());
+    if (DEBUGFLAG) Serial.printf("[WiFi] Connected to %s.\n", connectedSSID);
     tft.drawString(WiFi.localIP().toString(), 160, 130);
     delay(2000);
   } else {

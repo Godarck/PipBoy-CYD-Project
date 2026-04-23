@@ -67,6 +67,7 @@ int weatherGetAgeMinutes() {
 }
 
 void weatherForceUpdate() {
+  if (DEBUGFLAG) Serial.println("[WEATHER] Try force update.");
   forceUpdate = true;
 }
 
@@ -186,7 +187,7 @@ static int fetchWttr() {
   
   if (code == 200) {
     String payload = http.getString();
-    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", payload);
+    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", String(payload));
     
     int sep1 = payload.indexOf('|');
     int sep2 = payload.indexOf('|', sep1 + 1);
@@ -261,7 +262,7 @@ static int fetchOpenMeteo() {
   
   if (code == 200) {
     String payload = http.getString();
-    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", payload);
+    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", String(payload));
 
     StaticJsonDocument<512> doc;
     if (!deserializeJson(doc, payload)) {
@@ -425,14 +426,14 @@ void weatherUpdate() {
   
   forceUpdate = false;
   lastAttempt = millis();
-  
+  if (DEBUGFLAG) Serial.println("[WEATHER] Try to update weather data.");
   // Нет WiFi - пробуем EEPROM
   if (WiFi.status() != WL_CONNECTED) {
     if (DEBUGFLAG) Serial.println("[WEATHER] No WiFi, loading from EEPROM");
     weatherLoadFromEEPROM();
     return;
   }
-  
+  if (DEBUGFLAG) Serial.println("[WEATHER] Trying wttr ....");
   // Пробуем wttr.in
   int result = fetchWttr();
   
@@ -441,7 +442,7 @@ void weatherUpdate() {
     #if DEBUGFLAG
     Serial.print("[WEATHER] Wttr failed. Error: ");
     Serial.println(result);
-    Serial.println("[WEATHER] Trying Open-Meteo.... ");
+    Serial.println("[WEATHER] Trying Open-Meteo .... ");
     #endif
     result = fetchOpenMeteo();
   }

@@ -8,7 +8,7 @@ partition scheme: NoOta 2mb APP / 2mb SPIFFS
 events run: core1
 arduino runs: core1
 Upload speed: 460800
-PSRAm: Enabled
+PSRAm: Disabled
 
  libs : 
 //esp32-audioi2s-master
@@ -767,22 +767,22 @@ void ShowTFTUserSetup()
 }
 else if (user.tft_driver == 0xE9D) Serial.println("Display driver = ePaper\n");
 
-if (user.pin_tft_mosi = 13) { Serial.print("MOSI        OK = ");   Serial.print(getPinName(user.pin_tft_mosi)); } else { Serial.print("MOSI        = ERROR , NEED 13  | But define is = "); Serial.print(getPinName(user.pin_tft_mosi));}
-if (user.pin_tft_miso = 12) { Serial.print("\nMISO        OK = "); Serial.print(getPinName(user.pin_tft_miso)); } else { Serial.print("\nMISO        = ERROR , NEED 12  | But define is = "); Serial.print(getPinName(user.pin_tft_miso));}
-if (user.pin_tft_clk  = 14) { Serial.print("\nSCLK        OK = "); Serial.print(getPinName(user.pin_tft_clk)); } else {  Serial.print("\nSCLK        = ERROR , NEED 14  | But define is = "); Serial.print(getPinName(user.pin_tft_clk));}
-if (user.pin_tft_dc   = 2 ) { Serial.print("\nDC          OK = "); Serial.print(getPinName(user.pin_tft_dc)); } else {   Serial.print("\nDC          = ERROR , NEED 2   | But define is = "); Serial.print(getPinName(user.pin_tft_dc));}
-if (user.pin_tft_cs   = 15) { Serial.print("\nCS          OK = "); Serial.print(getPinName(user.pin_tft_cs)); } else {   Serial.print("\nCS          = ERROR , NEED 15  | But define is = "); Serial.print(getPinName(user.pin_tft_cs));}
-if (user.pin_tch_cs   = 33) { Serial.print("\nTOUCH_CS    OK = "); Serial.print(getPinName(user.pin_tch_cs)); } else {   Serial.print("\nTOUCH_CS    = ERROR , NEED 33  | But define is = "); Serial.print(getPinName(user.pin_tch_cs));}
+if (user.pin_tft_mosi == 13) { Serial.print("MOSI        OK = ");   Serial.print(getPinName(user.pin_tft_mosi)); } else { Serial.print("MOSI        = ERROR , NEED 13  | But define is = "); Serial.print(getPinName(user.pin_tft_mosi));}
+if (user.pin_tft_miso == 12) { Serial.print("\nMISO        OK = "); Serial.print(getPinName(user.pin_tft_miso)); } else { Serial.print("\nMISO        = ERROR , NEED 12  | But define is = "); Serial.print(getPinName(user.pin_tft_miso));}
+if (user.pin_tft_clk  == 14) { Serial.print("\nSCLK        OK = "); Serial.print(getPinName(user.pin_tft_clk)); } else {  Serial.print("\nSCLK        = ERROR , NEED 14  | But define is = "); Serial.print(getPinName(user.pin_tft_clk));}
+if (user.pin_tft_dc   == 2 ) { Serial.print("\nDC          OK = "); Serial.print(getPinName(user.pin_tft_dc)); } else {   Serial.print("\nDC          = ERROR , NEED 2   | But define is = "); Serial.print(getPinName(user.pin_tft_dc));}
+if (user.pin_tft_cs   == 15) { Serial.print("\nCS          OK = "); Serial.print(getPinName(user.pin_tft_cs)); } else {   Serial.print("\nCS          = ERROR , NEED 15  | But define is = "); Serial.print(getPinName(user.pin_tft_cs));}
+if (user.pin_tch_cs   == 33) { Serial.print("\nTOUCH_CS    OK = "); Serial.print(getPinName(user.pin_tch_cs)); } else {   Serial.print("\nTOUCH_CS    = ERROR , NEED 33  | But define is = "); Serial.print(getPinName(user.pin_tch_cs));}
 
-if (user.tft_width = 320) {   Serial.print("\nTFT_WIDTH   OK = "); Serial.print(user.tft_width); } else {                Serial.print("\nTFT_WIDTH   = ERROR , NEED 320 | But define is = "); Serial.print(user.tft_width);}
-if (user.tft_height = 240) {  Serial.print("\nTFT_HEIGHT  OK = "); Serial.print(user.tft_height); } else {               Serial.print("\nTFT_HEIGHT  = ERROR , NEED 240 | But define is = "); Serial.print(user.tft_height);}
+if (user.tft_width == 240) {   Serial.print("\nTFT_WIDTH   OK = "); Serial.print(user.tft_width); } else {                Serial.print("\nTFT_WIDTH   = ERROR , NEED 240 | But define is = "); Serial.print(user.tft_width);}
+if (user.tft_height == 320) {  Serial.print("\nTFT_HEIGHT  OK = "); Serial.print(user.tft_height); } else {               Serial.print("\nTFT_HEIGHT  = ERROR , NEED 320 | But define is = "); Serial.print(user.tft_height);}
 
 
-if (user.pin_tft_led = 27) {  Serial.print("\nTFT_BL      OK = "); Serial.print(getPinName(user.pin_tft_led)); } else {   Serial.print("\nTFT_BL      = ERROR , NEED 27  | But define is = "); Serial.print(getPinName(user.pin_tft_led));}
+if (user.pin_tft_led == 27) {  Serial.print("\nTFT_BL      OK = "); Serial.print(getPinName(user.pin_tft_led)); } else {   Serial.print("\nTFT_BL      = ERROR , NEED 27  | But define is = "); Serial.print(getPinName(user.pin_tft_led));}
 
-if (user.tft_spi_freq = 80000000){  Serial.print("\nSPI_FREQUENCY         OK = "); Serial.print(user.tft_spi_freq); } else {   Serial.print("\nSPI_FREQUENCY        = ERROR , NEED 80 000 000  | But define is = "); Serial.print(user.tft_spi_freq);}
-if (user.tft_rd_freq = 80000000) {  Serial.print("\nSPI_READ_FREQUENCY    OK = "); Serial.print(user.tft_rd_freq); } else {    Serial.print("\nSPI_READ_FREQUENCY   = ERROR , NEED 80 000 000  | But define is = "); Serial.print(user.tft_rd_freq);}
-if (user.tch_spi_freq = 2500000) {  Serial.print("\nSPI_TOUCH_FREQUENCY   OK = "); Serial.print(user.tch_spi_freq); } else {   Serial.print("\nSPI_TOUCH_FREQUENCY  = ERROR , NEED 2 500 000   | But define is = "); Serial.print(user.tch_spi_freq);}
+if (user.tft_spi_freq == 800){  Serial.print("\nSPI_FREQUENCY         OK = "); Serial.printf("%d00000",user.tft_spi_freq); } else {   Serial.print("\nSPI_FREQUENCY        = ERROR , NEED 80 000 000  | But define is = "); Serial.printf("%d00000",user.tft_spi_freq);}
+if (user.tft_rd_freq == 800) {  Serial.print("\nSPI_READ_FREQUENCY    OK = "); Serial.printf("%d00000",user.tft_rd_freq); } else {    Serial.print("\nSPI_READ_FREQUENCY   = ERROR , NEED 80 000 000  | But define is = "); Serial.printf("%d00000",user.tft_rd_freq);}
+if (user.tch_spi_freq == 25) {  Serial.print("\nSPI_TOUCH_FREQUENCY   OK = "); Serial.printf("%d00000",user.tch_spi_freq); } else {   Serial.print("\nSPI_TOUCH_FREQUENCY  = ERROR , NEED 2 500 000   | But define is = "); Serial.printf("%d00000",user.tch_spi_freq);}
 
 Serial.print("\n=============== END of TFT Debug TFT UserSetup.h ===================\n\n");
 }
@@ -1703,10 +1703,10 @@ void drawPipBoyScreen3() {
     {
       tft.setTextColor(TFT_GREEN);
       tft.drawString("Loading ...", 160, 120);
-      weatherForceUpdate();
+      //weatherForceUpdate();
     }
     needUpdateScreenWeather = true;
-    weatherUpdate();
+    //weatherUpdate();
     drawTabButtons();
     lastScreen = currentScreen;
     return;
@@ -1735,7 +1735,7 @@ void drawPipBoyScreen3() {
   tft.drawString(tempDisplay, 160, 40);
   int Widthstr = tft.textWidth(tempDisplay);
 
-  if (DEBUGFLAG) Serial.printf("[GUI - Weather] Text width '%s' string is: %d\n", tempDisplay, Widthstr);
+  if (DEBUGFLAG) Serial.printf("[GUI - Weather] Text width '%s' is: %d\n", tempDisplay, Widthstr);
   tft.drawCircle((320/2) + (Widthstr/2) - 50 , 45, 6, TFT_GREEN);
   tft.drawCircle((320/2) + (Widthstr/2) - 50, 45, 5, TFT_GREEN);
   tft.drawCircle((320/2) + (Widthstr/2) - 50, 45, 4, TFT_GREEN);
@@ -1770,7 +1770,16 @@ void drawPipBoyScreen3() {
   tft.setCursor(60, 190);
   tft.print("Updated: ");
   updateWeatherTimeDisplay();
-  weatherUpdate();
+  
+  if (!weatherHasData() || (WiFi.status() != WL_CONNECTED))
+  {
+    int mins = weatherGetAgeMinutes();
+    if (mins > 30)
+    {
+      weatherForceUpdate();
+      weatherUpdate();
+    }
+  }
   // Индикатор источника
   tft.setTextSize(1);
   tft.setTextDatum(TR_DATUM);
@@ -1798,7 +1807,8 @@ void updateWeatherTimeDisplay() {
     if (weatherLastUpdate())
     {
       time_t dateUpW = weatherLastUpdate();
-      stringw = pad2(day(dateUpW)) + "." + pad2(month(dateUpW)) + "." + String(year(dateUpW)) + " " + pad2(hour(dateUpW)) + ":" + pad2(minute(dateUpW));
+      time_t local = myTZ.toLocal(dateUpW, &tcr);
+      stringw = pad2(day(local)) + "." + pad2(month(local)) + "." + String(year(local)) + " " + pad2(hour(local)) + ":" + pad2(minute(local));
     }
     else
     {
@@ -2065,7 +2075,8 @@ void drawWeatherSettings() {
   if (weatherLastUpdate())
   {
     time_t dateUpW = weatherLastUpdate();
-    String stringw = "Last update: " + pad2(day(dateUpW)) + "." + pad2(month(dateUpW)) + "." + String(year(dateUpW)) + " " + pad2(hour(dateUpW)) + ":" + pad2(minute(dateUpW));
+    time_t local = myTZ.toLocal(dateUpW, &tcr);
+    String stringw = "Last update: " + pad2(day(local)) + "." + pad2(month(local)) + "." + String(year(local)) + " " + pad2(hour(local)) + ":" + pad2(minute(local));
     tft.drawString(stringw, LIST_X + (320 - LIST_X - 5)/2 , 180);
   }
 }

@@ -6,7 +6,7 @@
 #define DEBUGFLAG true
 
 #define PERSON_NAME "SAM"
-// ======================= TFT ПИНЫ (2.4 CYD Type C) =======================
+// ======================= TFT PINS SETUP (2.4 CYD Type C) =======================
 // edit UserSetup.h in TFT_eSPI library
 #define ILI9341_2_DRIVER
 #define ESP32_DMA
@@ -34,11 +34,11 @@
 #define SPI_TOUCH_FREQUENCY  2500000
 #define USE_HSPI_PORT
 
-// RGB LED (активный LOW)
+// RGB LED PINS (активный LOW)
 #define LED_R     4
 #define LED_G     17
 #define LED_B     16
-// ========================== SD CARD ==========================
+// ========================== SD CARD PINS ==========================
 #define FS_NO_GLOBALS
 #define SD_CS 5
 #define SD_SCLK 18
@@ -48,6 +48,7 @@
 #define RTC_ADDRESS 0x68
 #define RTC_SDA 21
 #define RTC_SCL 22
+#define GMT_SET +3 // ( or -3 etc)
 
 // ======================= EEPROM AT24C32 =======================
 #define EEPROM_ADDRESS 0x50 // or 0x57
@@ -73,14 +74,14 @@
 // ======================= RADIO =======================
 // Настройки пинов
 #define RADIO_DAC_PIN 26        // GPIO26 - DAC_CHANNEL_2
-#define RADIO_VOLUME_DEFAULT 10 // 0-21 (громкость усилителя 8002D)
+#define RADIO_VOLUME_DEFAULT 50 // 0-100 (громкость усилителя 8002D)
 
 
-// Координаты по умолчанию для погоды (Москва)
+// Координаты GPS по умолчанию для погоды (Москва)
 #define DEFAULT_LAT "55.7558"
 #define DEFAULT_LON "37.6173"
 
-// ======================= UI =======================
+// ======================= UI ========================
 #define TAB_Y 205
 #define TAB_H 32
 #define TAB_W 64
@@ -93,7 +94,7 @@
 #define KEY_H 24
 #define KEY_GAP 2
 
-// WiFi list dimensions
+// ================== WiFi list dimensions =============
 #define LIST_X 85
 #define LIST_Y 40
 #define LIST_W 190
@@ -102,8 +103,6 @@
 #define MAX_NETWORKS 15
 
 // ======================= DEBUG =======================
-//#define DEBUG_ENABLED true
-void debugPrint(const char* label, int value);
-void debugPrint(const char* label, const char* value);
+//void Debug(String label, uint8_t val)
 
 #endif

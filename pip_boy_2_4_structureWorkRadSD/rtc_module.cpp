@@ -10,7 +10,7 @@ time_t lastNtpSync = 0;
 
 // Часовой пояс (настрой под себя)
 TimeChangeRule myStandardTime = {"GMT", First, Sun, Nov, 2, 0};
-TimeChangeRule myDaylightSavingsTime = {"CDT", Second, Sun, Mar, 2, +3 * 60};  // +3 = GMT +3
+TimeChangeRule myDaylightSavingsTime = {"CDT", Second, Sun, Mar, 2, GMT_SET * 60};  // +3 = GMT +3
 Timezone myTZ(myStandardTime, myDaylightSavingsTime);
 TimeChangeRule *tcr;
 
@@ -60,7 +60,10 @@ void rtcInit() {
   Serial.print(" ");
   Serial.print(rtcNow.hour());
   Serial.print(":");
-  Serial.println(rtcNow.minute());
+  Serial.print(rtcNow.minute());
+  Serial.print(" WORK GMT: ");
+  Serial.print(GMT_SET);
+  Serial.println("");
   #endif
 }
 

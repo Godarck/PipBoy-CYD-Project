@@ -28,7 +28,7 @@ static AudioFileSourceID3 *id3 = nullptr;
 /* ===== Состояние ===== */
 static int        curStationIdx = 0;
 static int        curTrackIdx   = 0;
-static uint8_t    curVolume     = 50;
+static uint8_t    curVolume     = RADIO_VOLUME_DEFAULT;
 static volatile bool isPlayingFlag = false;
 static volatile bool softStopRequested = false;
 
