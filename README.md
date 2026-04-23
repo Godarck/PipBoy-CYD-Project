@@ -33,11 +33,9 @@ Arduino Json
 * Configure:
 config in config.h
 
-password default for wifi in wifi_module.cpp
+password default for wifi in wifi_module.cpp (only for first use)
 
-Default folder from SD card for mp3 in RadioModule.cpp
-
-in RadioModule.cpp pin 26 for output audio stream
+Default folder from SD card for mp3 in RadioModule.cpp (only for first use)
 
 
 * ======= Components =========
