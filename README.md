@@ -31,10 +31,14 @@ HTTPClient
 Arduino Json
 
 * Configure:
+  
 Config in config.h
-PERSON_NAME
-DEBUGFLAG if you need debug. Set flag true for first run.
-GMT_SET to set GMT region for clock
+
+PERSON_NAME - Name in main screen
+
+DEBUGFLAG - if you need debug. Set flag true for first run.
+
+GMT_SET - to set GMT region for clock
 
 password default for wifi in wifi_module.cpp (only for first use)
 
