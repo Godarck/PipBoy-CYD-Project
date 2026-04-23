@@ -32,6 +32,7 @@ Arduino Json
 
 * Configure:
 config in config.h
+
 password default for wifi in wifi_module.cpp
 
 Default folder from SD card for mp3 in RadioModule.cpp
