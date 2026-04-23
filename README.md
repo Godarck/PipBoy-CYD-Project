@@ -95,7 +95,7 @@ HP and AP indicators are calculated automatically, depending on the time of day.
 
 Left corner: 3 states:
 
-framed - active
+In frame - active
 
 Wi-Fi - WiFi connected
 
