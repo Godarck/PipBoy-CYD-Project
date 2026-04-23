@@ -7,9 +7,9 @@ void eepromInit() {
   Wire.beginTransmission(EEPROM_ADDRESS);
   if (Wire.endTransmission() == 0) {
     eepromFound = true;
-    if (DEBUGFLAG) Serial.println("EEPROM AT24C32 OK");
+    if (DEBUGFLAG) Serial.println("[EEPROM] AT24C32     OK");
   } else {
-    if (DEBUGFLAG) Serial.println("EEPROM not found");
+    if (DEBUGFLAG) Serial.println("[EEPROM] AT24C32     ERROR = not found");
   }
 }
 
@@ -26,7 +26,7 @@ bool eepromWriteSlot(uint8_t slot, uint8_t* data) {
   Wire.write((address >> 8) & 0xFF);
   Wire.write(address & 0xFF);
 
-  if (DEBUGFLAG) Serial.println("Write in EEPROM");
+  if (DEBUGFLAG) Serial.println("[EEPROM] Write in EEPROM");
   for (int i = 0; i < 32; i++) {
     Wire.write(data[i]);
     if (DEBUGFLAG) Serial.print(" ");
@@ -53,13 +53,11 @@ bool eepromReadSlot(uint8_t slot, uint8_t* buffer) {
   
   uint8_t got = Wire.requestFrom(EEPROM_ADDRESS, 32);
   if (got != 32) {
-    if (DEBUGFLAG) Serial.print("EEPROM read error: got ");
-    if (DEBUGFLAG) Serial.print(got);
-    if (DEBUGFLAG) Serial.println(" bytes instead of 32");
+    if (DEBUGFLAG) Serial.printf("[EEPROM] read slot %d ERROR: got %d bytes instead of 32", slot, got);
     return false;
   }
 
-  if (DEBUGFLAG) Serial.println("READ from EEPROM:");
+  if (DEBUGFLAG) Serial.printf("[EEPROM] READ EEPROM from slot %d OK :\n", slot);
   for (int i = 0; i < 32; i++) {
     buffer[i] = Wire.available() ? Wire.read() : 0xFF;
     if (DEBUGFLAG) Serial.print(buffer[i], HEX);
@@ -74,10 +72,13 @@ bool eepromReadSlot(uint8_t slot, uint8_t* buffer) {
       break;
     }
   }
-    if (DEBUGFLAG) Serial.println();
-  if (isEmpty)
-    return false;
 
+  if (isEmpty)
+  {
+     if (DEBUGFLAG) Serial.printf("[EEPROM] READ EEPROM from slot %d  OK : \nSLOT EMPTY", slot);
+    return false;
+  }
+  if (DEBUGFLAG) Serial.println();
   return true;
 }
 

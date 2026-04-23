@@ -361,6 +361,8 @@ void radioPlaySDFolder(const String& folder) {
 
 void radioPlay() {
     if (isPlayingFlag) return;
+
+    if (DEBUGFLAG) Serial.printf("[RADIO] Start playing..\n");
     if (radioPlaySource == 1) sendCmd(CMD_PLAY_WIFI, curStationIdx);
     else if (radioPlaySource == 0) sendCmd(CMD_PLAY_SD, curTrackIdx);
 }

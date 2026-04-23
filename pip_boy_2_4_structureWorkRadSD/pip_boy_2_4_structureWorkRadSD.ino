@@ -171,6 +171,7 @@ TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite sprite = TFT_eSprite(&tft);
  //SPIClass SDSPI(VSPI);
 
+setup_t user;
 
 int currentScreen = 0;
 int lastScreen = -1;  //mp3/
@@ -224,6 +225,7 @@ void Debug(String label, uint8_t val)
 void initI2C();
 bool LoadBackUpFromEPPR();
 bool SaveBackUpToEPPR();
+void ShowTFTUserSetup();
 void initStartUp();
 void drawWindArrow();
 void drawScanlines();
@@ -240,6 +242,7 @@ void UpdateRightPanel();
 bool parseTime(const char* input);
 void sanitizeTimeInput(char* input);
 bool isValidString(const String& str);
+String pad2(uint8_t val);
 
 ///General Setup Screen
 
@@ -402,15 +405,24 @@ void setup() {
   digitalWrite(LED_G, HIGH);
   digitalWrite(LED_B, HIGH);
   
+  /*
+  if (!tft.begin(TFT_BLACK))
+  {
+    if (DEBUGFLAG) Serial.print("FAIL to init TFT!\n\n")
+    return;
+  }
+  */
   tft.init();
   tft.setSwapBytes(false);
   tft.setRotation(1);
     // Инициализация модулей
-  initStartUp();
+  
 
   tft.setTouch(calData);
   
-  
+  if (DEBUGFLAG) ShowTFTUserSetup();
+
+  initStartUp();
   // Спрайт для часов
   tft.setTextFont(clockFont);
   tft.setTextSize(clockSize);
@@ -741,7 +753,70 @@ void UpdateMetaData()
 
 }
 
-///
+////// =====================
+void ShowTFTUserSetup()
+{
+  tft.getSetup(user); //
+  Serial.print("========== DISPLAY INFO: ===========\n\n");
+  if (user.tft_driver != 0xE9D) // For ePaper displays the size is defined in the sketch
+{
+  Serial.print("Display driver = "); Serial.println(user.tft_driver, HEX); // Hexadecimal code
+  Serial.print("Display width  = "); Serial.println(user.tft_width);  // Rotation 0 width and height
+  Serial.print("Display height = "); Serial.println(user.tft_height);
+  Serial.println();
+}
+else if (user.tft_driver == 0xE9D) Serial.println("Display driver = ePaper\n");
+
+if (user.pin_tft_mosi = 13) { Serial.print("MOSI        OK = ");   Serial.print(getPinName(user.pin_tft_mosi)); } else { Serial.print("MOSI        = ERROR , NEED 13  | But define is = "); Serial.print(getPinName(user.pin_tft_mosi));}
+if (user.pin_tft_miso = 12) { Serial.print("\nMISO        OK = "); Serial.print(getPinName(user.pin_tft_miso)); } else { Serial.print("\nMISO        = ERROR , NEED 12  | But define is = "); Serial.print(getPinName(user.pin_tft_miso));}
+if (user.pin_tft_clk  = 14) { Serial.print("\nSCLK        OK = "); Serial.print(getPinName(user.pin_tft_clk)); } else {  Serial.print("\nSCLK        = ERROR , NEED 14  | But define is = "); Serial.print(getPinName(user.pin_tft_clk));}
+if (user.pin_tft_dc   = 2 ) { Serial.print("\nDC          OK = "); Serial.print(getPinName(user.pin_tft_dc)); } else {   Serial.print("\nDC          = ERROR , NEED 2   | But define is = "); Serial.print(getPinName(user.pin_tft_dc));}
+if (user.pin_tft_cs   = 15) { Serial.print("\nCS          OK = "); Serial.print(getPinName(user.pin_tft_cs)); } else {   Serial.print("\nCS          = ERROR , NEED 15  | But define is = "); Serial.print(getPinName(user.pin_tft_cs));}
+if (user.pin_tch_cs   = 33) { Serial.print("\nTOUCH_CS    OK = "); Serial.print(getPinName(user.pin_tch_cs)); } else {   Serial.print("\nTOUCH_CS    = ERROR , NEED 33  | But define is = "); Serial.print(getPinName(user.pin_tch_cs));}
+
+if (user.tft_width = 320) {   Serial.print("\nTFT_WIDTH   OK = "); Serial.print(user.tft_width); } else {                Serial.print("\nTFT_WIDTH   = ERROR , NEED 320 | But define is = "); Serial.print(user.tft_width);}
+if (user.tft_height = 240) {  Serial.print("\nTFT_HEIGHT  OK = "); Serial.print(user.tft_height); } else {               Serial.print("\nTFT_HEIGHT  = ERROR , NEED 240 | But define is = "); Serial.print(user.tft_height);}
+
+
+if (user.pin_tft_led = 27) {  Serial.print("\nTFT_BL      OK = "); Serial.print(getPinName(user.pin_tft_led)); } else {   Serial.print("\nTFT_BL      = ERROR , NEED 27  | But define is = "); Serial.print(getPinName(user.pin_tft_led));}
+
+if (user.tft_spi_freq = 80000000){  Serial.print("\nSPI_FREQUENCY         OK = "); Serial.print(user.tft_spi_freq); } else {   Serial.print("\nSPI_FREQUENCY        = ERROR , NEED 80 000 000  | But define is = "); Serial.print(user.tft_spi_freq);}
+if (user.tft_rd_freq = 80000000) {  Serial.print("\nSPI_READ_FREQUENCY    OK = "); Serial.print(user.tft_rd_freq); } else {    Serial.print("\nSPI_READ_FREQUENCY   = ERROR , NEED 80 000 000  | But define is = "); Serial.print(user.tft_rd_freq);}
+if (user.tch_spi_freq = 2500000) {  Serial.print("\nSPI_TOUCH_FREQUENCY   OK = "); Serial.print(user.tch_spi_freq); } else {   Serial.print("\nSPI_TOUCH_FREQUENCY  = ERROR , NEED 2 500 000   | But define is = "); Serial.print(user.tch_spi_freq);}
+
+Serial.print("\n=============== END of TFT Debug TFT UserSetup.h ===================\n\n");
+}
+
+
+int8_t getPinName(int8_t pin)
+{
+  // For ESP32 and RP2040 pin labels on boards use the GPIO number
+  if (user.esp == 0x32 || user.esp == 0x2040) return pin;
+
+  if (user.esp == 0x8266) {
+    // For ESP8266 the pin labels are not the same as the GPIO number
+    // These are for the NodeMCU pin definitions:
+    //        GPIO       Dxx
+    if (pin == 16) return 0;
+    if (pin ==  5) return 1;
+    if (pin ==  4) return 2;
+    if (pin ==  0) return 3;
+    if (pin ==  2) return 4;
+    if (pin == 14) return 5;
+    if (pin == 12) return 6;
+    if (pin == 13) return 7;
+    if (pin == 15) return 8;
+    if (pin ==  3) return 9;
+    if (pin ==  1) return 10;
+    if (pin ==  9) return 11;
+    if (pin == 10) return 12;
+  }
+
+  if (user.esp == 0x32F) return pin;
+
+  return pin; // Invalid pin
+}
+
 void initI2C()
 {
   Wire.begin(RTC_SDA,RTC_SCL);
@@ -749,6 +824,7 @@ void initI2C()
   int nDevices = 0;
   tft.setTextColor(TFT_GREEN);
   tft.println("Scanning for I2C devices ...");
+  if (DEBUGFLAG) Serial.print("============ Scanning for I2C devices ... ============\n");
   tft.println(" ");
   delay(20);
   for (address = 0x01; address < 0x7f; address++) {
@@ -756,12 +832,14 @@ void initI2C()
     error = Wire.endTransmission();
     if (error == 0) {
       tft.setTextColor(TFT_GREEN);
+      if (DEBUGFLAG) Serial.printf("I2C device found at address 0x%02X\n", address);
       tft.printf("I2C device found at address 0x%02X\n", address);
       tft.println(" ");
       delay(20);
       nDevices++;
     } else if (error != 2) {
       tft.setTextColor(TFT_RED);
+      if (DEBUGFLAG) Serial.printf("Error %d at address 0x%02X\n", error, address);
       tft.printf("Error %d at address 0x%02X\n", error, address);
       tft.println(" ");
       delay(2000);
@@ -769,11 +847,12 @@ void initI2C()
   }
   if (nDevices == 0) {
     tft.setTextColor(TFT_RED);
+    if (DEBUGFLAG) Serial.print("No I2C devices found!\n"); 
     tft.println("No I2C devices found");
     tft.println(" ");
     delay(2000);
   }
-
+  if (DEBUGFLAG) Serial.println("============== END OF I2C SCANNER ===============\n");
   tft.setTextColor(TFT_GREEN);
   delay(200);
 }
@@ -994,12 +1073,12 @@ bool ErrorB = false;
 
   if (ErrorB)
   {
-    if (DEBUGFLAG) Serial.printf("\n[EEPROM] read slot TOTAL backup --- FAILED:\n\nCurrent values:\n GPS: %s , %s\n WiFi Pass: %s\n MP3 folder:%s\n\n", weatherLat, weatherLon, StandartWiFiPass, radioSDFolder);
+    if (DEBUGFLAG) Serial.printf("\n[EEPROM] read slot TOTAL backup --- FAILED:\n\nCurrent values:\nSLOT1:\nGPS: %s , %s\nSLOT2:\n WiFi Pass: %s\nSLOT3:\n MP3 folder:%s\nSLOT4:\n Time timers:\n  1:%s %d:%d\n  2:%s %d:%d\n  3:%s %d:%d\n\n", weatherLat, weatherLon, StandartWiFiPass, radioSDFolder, T1S, T1h, T1m, T2S, T2h, T2m, T3S, T3h, T3m);
     return false;
   }
   else
   {
-  if (DEBUGFLAG) Serial.printf("\n[EEPROM] read slot backup --- OK:\n GPS: %s , %s\n WiFi Pass: %s\n MP3 folder:%s\n", weatherLat, weatherLon, StandartWiFiPass, radioSDFolder);
+  if (DEBUGFLAG) Serial.printf("\n[EEPROM] read slot backup --- OK:\nSLOT1:\n GPS: %s , %s\nSLOT2:\n WiFi Pass: %s\nSLOT3:\n MP3 folder:%s\nSLOT4:\n Time timers:\n %s %d:%d\n %s %d:%d\n %s %d:%d\n\n", weatherLat, weatherLon, StandartWiFiPass, radioSDFolder, T1S, T1h, T1m, T2S, T2h, T2m, T3S, T3h, T3m);
     return true;
   }
 }
@@ -1207,6 +1286,7 @@ void drawVaultBoy(int16_t cx, int16_t cy, int8_t frame) {
 
 
 void drawPipBoyScreen() {
+  if (DEBUGFLAG) Serial.println("[GUI] Open screen 0 - Main Screen");
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
   updateHPAP();
@@ -1485,6 +1565,8 @@ void DrawDate(time_t utc) {
 }
 
 void drawPipBoyScreen1() {
+
+  if (DEBUGFLAG) Serial.println("[GUI] Open screen 1 : CLOCK");
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
   
@@ -1536,6 +1618,7 @@ void drawPipBoyScreen1() {
 
 
 void drawPipBoyScreen2() {
+  if (DEBUGFLAG) Serial.println("[GUI] Open screen 2 : RADIO");
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
  tft.setTextColor(TFT_GREEN);
@@ -1591,6 +1674,7 @@ void drawPipBoyScreen2() {
 }
 
 void drawPipBoyScreen3() {
+  if (DEBUGFLAG) Serial.println("[GUI] Open screen 3 : WEATHER");
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
   
@@ -1651,7 +1735,7 @@ void drawPipBoyScreen3() {
   tft.drawString(tempDisplay, 160, 40);
   int Widthstr = tft.textWidth(tempDisplay);
 
-  if (DEBUGFLAG) Serial.printf("Text width temp: %d\n", Widthstr);
+  if (DEBUGFLAG) Serial.printf("[GUI - Weather] Text width '%s' string is: %d\n", tempDisplay, Widthstr);
   tft.drawCircle((320/2) + (Widthstr/2) - 50 , 45, 6, TFT_GREEN);
   tft.drawCircle((320/2) + (Widthstr/2) - 50, 45, 5, TFT_GREEN);
   tft.drawCircle((320/2) + (Widthstr/2) - 50, 45, 4, TFT_GREEN);
@@ -1782,6 +1866,8 @@ void updateWeatherTimeDisplay() {
 
 // ======================= ЭКРАН 4: GENERAL =======================
 void drawPipBoyScreen4() {
+
+  if (DEBUGFLAG) Serial.println("[GUI] Open screen 4 : GENERAL (Setup)");
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
   drawButtonsScreen4();
@@ -2658,7 +2744,7 @@ void updateHPAP() {
         if (currentAP > apMax) currentAP = apMax;
     }
 
-    if (DEBUGFLAG) Serial.printf("HP %d/%d AP%d/%d, curr minutes:%d\n", currentHP, hpMax, currentAP, apMax, minutes);
+    //if (DEBUGFLAG) Serial.printf("HP %d/%d AP%d/%d, curr minutes:%d\n", currentHP, hpMax, currentAP, apMax, minutes);
 
     if (currentScreen == 0)
     {

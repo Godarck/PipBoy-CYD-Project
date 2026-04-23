@@ -176,7 +176,7 @@ static int fetchWttr() {
   HTTPClient http;
   String url = "http://wttr.in/" + weatherLat + "," + weatherLon + "?format=%t|%w|%C";
   
-  if (DEBUGFLAG) Serial.print("Wttr: ");
+  if (DEBUGFLAG) Serial.print("[WEATHER] Wttr: ");
   if (DEBUGFLAG) Serial.println(url);
   
   http.begin(url);
@@ -186,7 +186,7 @@ static int fetchWttr() {
   
   if (code == 200) {
     String payload = http.getString();
-    if (DEBUGFLAG) Serial.println(payload);
+    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", payload);
     
     int sep1 = payload.indexOf('|');
     int sep2 = payload.indexOf('|', sep1 + 1);
@@ -236,7 +236,7 @@ static int fetchWttr() {
       
       currentWeather.source = WEATHER_PRIMARY;
       currentWeather.lastUpdate = now();
-      if (DEBUGFLAG) Serial.println("Wttr OK");
+      if (DEBUGFLAG) Serial.println("[WEATHER] Wttr OK");
     } else {
       code = -100; // Parse error
     }
@@ -251,7 +251,7 @@ static int fetchOpenMeteo() {
   String url = "http://api.open-meteo.com/v1/forecast?latitude=" + 
                weatherLat + "&longitude=" + weatherLon + "&current_weather=true";
   
-  if (DEBUGFLAG) Serial.print("Open-Meteo: ");
+  if (DEBUGFLAG) Serial.print("[WEATHER] Open-Meteo: ");
   if (DEBUGFLAG) Serial.println(url);
   
   http.begin(url);
@@ -261,7 +261,7 @@ static int fetchOpenMeteo() {
   
   if (code == 200) {
     String payload = http.getString();
-    if (DEBUGFLAG) Serial.println(payload);
+    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", payload);
 
     StaticJsonDocument<512> doc;
     if (!deserializeJson(doc, payload)) {
@@ -279,7 +279,7 @@ static int fetchOpenMeteo() {
       
       currentWeather.source = WEATHER_OPENMETEO;
       currentWeather.lastUpdate = now();
-      if (DEBUGFLAG) Serial.println("Open-Meteo OK");
+      if (DEBUGFLAG) Serial.println("[WEATHER] Open-Meteo OK");
     } else {
       code = -101; // JSON error
     }
@@ -298,13 +298,13 @@ bool weatherLoadFromEEPROM() {
   memset(&data, 0, sizeof(WeatherData));
   
   if (!eepromReadSlot(0, (uint8_t*)&data)) {
-    if (DEBUGFLAG) Serial.println("[EEPROM] read weather slot --- failed");
+    if (DEBUGFLAG) Serial.println("[WEATHER] read weather slot 0 --- failed");
     return false;
   }
   
   // Проверка valid
   if (data.valid != 1) {
-    if (DEBUGFLAG) Serial.print("[WEATHER] weather data in EEPROM invalid, valid=");
+    if (DEBUGFLAG) Serial.print("[WEATHER] weather data in EEPROM invalid, valid = ");
     if (DEBUGFLAG) Serial.println(data.valid);
     return false;
   }
@@ -318,9 +318,9 @@ bool weatherLoadFromEEPROM() {
   
   if (calc != data.checksum) {
     #if DEBUGFLAG
-    Serial.print("[WEATHER] EEPROM  checksum mismatch: calc=");
+    Serial.print("[WEATHER] EEPROM  checksum mismatch: calc =");
     Serial.print(calc);
-    Serial.print(" stored=");
+    Serial.print(" , stored =");
     Serial.println(data.checksum);
     #endif
     return false;
@@ -343,8 +343,12 @@ bool weatherLoadFromEEPROM() {
   time_t rtcNow = now();
   time_t dataTime = data.timestamp;
 
-  if (dataTime > rtcNow)   rtc.adjust(DateTime(year(dataTime), month(dataTime), day(dataTime), 
+  if (dataTime > rtcNow) {
+
+   rtc.adjust(DateTime(year(dataTime), month(dataTime), day(dataTime), 
                      hour(dataTime), minute(dataTime), second(dataTime)));
+    Serial.print("[WEATHER] Date in RTC older then in Weather backup. Adjust RTC.\n");
+  }
 
   long ageSec = (rtcNow - dataTime);// / 1000;
   if (ageSec < 0) ageSec = 0;
@@ -355,11 +359,14 @@ bool weatherLoadFromEEPROM() {
   
   currentWeather.source = WEATHER_EEPROM;
   #if DEBUGFLAG
-  Serial.print("[WEATHER] EEPROM loaded OK, Update age =");
+  Serial.print("[WEATHER] EEPROM loaded OK, Update age = ");
   Serial.print(ageSec);
-  Serial.println(" sec, ");
+  Serial.print(" sec, ");
   Serial.print(ageSec / 60);
   Serial.println(" min.");
+    char stringwu[32];
+    snprintf(stringwu, sizeof(stringwu), "%02d.%02d.%04d %02d:%02d:%02d", day(dataTime), month(dataTime), year(dataTime), hour(dataTime), minute(dataTime), second(dataTime));
+    Serial.printf("Update date was: %s\n", stringwu); 
   #endif
   return true;
 }
@@ -400,7 +407,7 @@ void weatherSaveToEEPROM() {
   }
   
   if (eepromWriteSlot(0, (uint8_t*)&data)) {
-   if (DEBUGFLAG)  Serial.println("Weather saved to EEPROM");
+   if (DEBUGFLAG)  Serial.println("[WEATHER] Weather saved to EEPROM");
   }
 }
 

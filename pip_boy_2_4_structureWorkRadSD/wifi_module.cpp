@@ -50,7 +50,7 @@ void scanWiFiNetworks() {
   tft.setTextDatum(MC_DATUM);
   tft.setTextSize(1);
   tft.drawString("SCANNING...", 160, 120);
-  
+  if (DEBUGFLAG) Serial.println("[WiFi] Scanning..");
   WiFi.mode(WIFI_STA);
   delay(100);
   
@@ -62,6 +62,10 @@ void scanWiFiNetworks() {
     wifiNetworks[i].ssid[32] = '\0';
     wifiNetworks[i].rssi = WiFi.RSSI(i);
     wifiNetworks[i].encryptionType = WiFi.encryptionType(i);
+    if (DEBUGFLAG) {
+        Serial.printf("[WiFi] Find SSID %s", String(wifiNetworks[i].ssid) );
+        if (wifiNetworks[i].encryptionType != WIFI_AUTH_OPEN) Serial.print(" - LOCK\n"); else Serial.print(" - OPEN\n");
+      }
   }
   
   WiFi.scanDelete();
@@ -269,6 +273,8 @@ void connectToWiFi(const char* ssid, const char* password) {
   tft.drawString(password, 160, 120);
 
   tft.setTextColor(TFT_GREEN);
+
+  if (DEBUGFLAG) Serial.printf("[WiFi] Connecting to %s. Password: %s ...\n", String(ssid) , String(password));
   WiFi.begin(ssid, password);
   
   int dots = 0;
@@ -292,6 +298,7 @@ void connectToWiFi(const char* ssid, const char* password) {
     tft.drawRect(40, 80, 240, 80, TFT_GREEN);
     tft.setTextColor(TFT_GREEN);
     tft.drawString("CONNECTED!", 160, 100);
+    if (DEBUGFLAG) Serial.printf("[WiFi] Connected. IP:%s\n", WiFi.localIP().toString());
     tft.drawString(WiFi.localIP().toString(), 160, 130);
     delay(2000);
   } else {
@@ -299,6 +306,8 @@ void connectToWiFi(const char* ssid, const char* password) {
     tft.drawRect(40, 80, 240, 80, TFT_GREEN);
     tft.setTextColor(TFT_RED);
     tft.setTextSize(2);
+    if (DEBUGFLAG) Serial.print("[WiFi] Connection failed. Check password.\n");
+    
     tft.drawString("FAILED!", 160, 110);
     tft.setTextSize(1);
     delay(2000);

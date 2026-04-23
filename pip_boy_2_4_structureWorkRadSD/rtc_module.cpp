@@ -51,7 +51,7 @@ void rtcInit() {
   DateTime rtcNow = rtc.now();
   setTime(rtcNow.unixtime());
   #if DEBUGFLAG
-  Serial.print("RTC OK: ");
+  Serial.print("[RTC]     OK DATE and TIME = ");
   Serial.print(rtcNow.year());
   Serial.print("-");
   Serial.print(rtcNow.month());
