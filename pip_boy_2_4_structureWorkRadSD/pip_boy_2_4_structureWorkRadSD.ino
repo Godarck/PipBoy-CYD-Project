@@ -732,8 +732,8 @@ void UpdateMetaData()
         tft.setTextSize(1);
         String VolumeInfo = "Volume: " + String(radioGetVolume());
         int widthtext = tft.textWidth(VolumeInfo);
-                  tft.fillRect((320 / 2) - (widthtext/2), 148, widthtext, 10, TFT_BLACK);
-                  drawScanlinesButtons((320 / 2) - (widthtext/2), 148, 10, widthtext);
+                  tft.fillRect((320 / 2) - (widthtext/2), 148, widthtext + 5, 10, TFT_BLACK);
+                  drawScanlinesButtons((320 / 2) - (widthtext/2), 148, 10, widthtext + 5);
                   tft.drawString(VolumeInfo, 320 / 2, 148);
          // }
     }
