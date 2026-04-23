@@ -17,7 +17,7 @@ arduino runs: core1
 
 Upload speed: 460800
 
-PSRAM: Enabled 
+PSRAM: Disabled 
 
 
 * Libraries:
@@ -31,7 +31,7 @@ HTTPClient
 Arduino Json
 
 * Configure:
-config in config.h
+Config in config.h
 
 password default for wifi in wifi_module.cpp (only for first use)
 
