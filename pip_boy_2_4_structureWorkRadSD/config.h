@@ -3,8 +3,9 @@
 
 #include <Arduino.h>
 
-
 #define DEBUGFLAG true
+
+#define PERSON_NAME "SAM"
 // ======================= TFT ПИНЫ (2.4 CYD Type C) =======================
 // edit UserSetup.h in TFT_eSPI library
 #define ILI9341_2_DRIVER

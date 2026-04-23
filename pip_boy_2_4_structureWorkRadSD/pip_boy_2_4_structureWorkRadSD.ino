@@ -1278,7 +1278,7 @@ void drawVaultBoy(int16_t cx, int16_t cy, int8_t frame) {
   tft.setTextSize(2);
   tft.setTextDatum(MC_DATUM);
   tft.setCursor(bitmapStartX, 185);
-  tft.print("SAM - Level ");
+  tft.printf("%S - Level ", PERSON_NAME);
   tft.print(frame + 1);
   updateLevel(frame + 1);
 }
