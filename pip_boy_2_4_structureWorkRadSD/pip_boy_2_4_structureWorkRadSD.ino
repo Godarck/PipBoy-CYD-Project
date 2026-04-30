@@ -142,7 +142,10 @@ struct BackUpTimers {
 } __attribute__((packed));   // <-- БЕЗ ПАДДИНГА!
 
 // Калибровка тачскрина (rotation 1)
-uint16_t calData[5] = { 294, 3577, 349, 3453, 0 };
+//uint16_t calData[5] = { 294, 3577, 349, 3453, 0 };
+
+// (rotation 3)
+uint16_t calData[5] = { 268, 3590, 332, 3534, 6 };
 
 // Настройки отображения часов
 const bool SHOW_24HOUR = true;
@@ -414,7 +417,7 @@ void setup() {
   */
   tft.init();
   tft.setSwapBytes(false);
-  tft.setRotation(1);
+  tft.setRotation(3);
     // Инициализация модулей
   
 

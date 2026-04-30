@@ -65,4 +65,6 @@ const char* radioGetCurrentTitle();
 const char* radioGetCurrentArtist();
 const char* radioGetCurrentSong();
 
+void cyrToLat(const char* in, char* out);
+
 #endif

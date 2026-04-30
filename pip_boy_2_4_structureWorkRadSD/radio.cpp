@@ -9,6 +9,8 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <SD.h>
+#include <string.h>
+#include <stdint.h>
 
 extern bool  sdCardInitialized;
 extern int   radioPlaySource;
@@ -450,7 +452,165 @@ int     radioGetStationIndex() { return curStationIdx; }
 const char* radioGetStationName() {
     return (curStationIdx >= 0 && curStationIdx < radioStationCount) ? radioStations[curStationIdx].name : "Unknown";
 }
+
 const char* radioGetCurrentTitle()  { 
-    return currentTitle; }
-const char* radioGetCurrentArtist() { return currentArtist; }
-const char* radioGetCurrentSong()   { return currentSongInfo; }
+    static char out[256] = {0};
+    if (currentTitle)
+        cyrToLat(currentTitle, out);
+    else
+        out[0] = '\0';
+    return out; 
+}
+
+const char* radioGetCurrentArtist() { 
+    static char out[256] = {0};
+    if (currentArtist)
+        cyrToLat(currentArtist, out);
+    else
+        out[0] = '\0';
+    return out; 
+}
+
+const char* radioGetCurrentSong()   { 
+    static char out[256] = {0};
+    if (currentSongInfo)
+        cyrToLat(currentSongInfo, out);
+    else
+        out[0] = '\0';
+    return out; 
+}
+
+
+
+// Транслитерация кириллицы → латиница
+// in  — входная строка UTF-8, max 255 символов + '\0'
+// out — выходной буфер char[256]
+void cyrToLat(const char* in, char* out) {
+    // Защита от NULL — если передали пустой указатель, просто выходим
+    if (!in || !out) {
+        if (out) out[0] = '\0';
+        return;
+    }
+
+    size_t i = 0;  // индекс во входном массиве
+    size_t j = 0;  // индекс в выходном массиве
+
+    // Читаем максимум 255 символов или до '\0'
+    while (i < 255 && j < 255 && in[i] != '\0') {
+        unsigned char c = (unsigned char)in[i];
+
+        // --- Английские и все ASCII: копируем напрямую ---
+        if (c < 0x80) {
+            out[j++] = in[i++];
+            continue;
+        }
+
+        // --- Кириллица UTF-8 (2 байта: 0xD0 или 0xD1 + второй байт) ---
+        if ((c == 0xD0 || c == 0xD1) && (i + 1) < 255 && in[i+1] != '\0') {
+            unsigned char c2 = (unsigned char)in[i + 1];
+            const char* rep = NULL;
+
+            if (c == 0xD0) {
+                switch (c2) {
+                    case 0x90: rep = "A";   break;  // А
+                    case 0x91: rep = "B";   break;  // Б
+                    case 0x92: rep = "V";   break;  // В
+                    case 0x93: rep = "G";   break;  // Г
+                    case 0x94: rep = "D";   break;  // Д
+                    case 0x95: rep = "E";   break;  // Е
+                    case 0x96: rep = "Zh";  break;  // Ж
+                    case 0x97: rep = "Z";   break;  // З
+                    case 0x98: rep = "I";   break;  // И
+                    case 0x99: rep = "J";   break;  // Й
+                    case 0x9A: rep = "K";   break;  // К
+                    case 0x9B: rep = "L";   break;  // Л
+                    case 0x9C: rep = "M";   break;  // М
+                    case 0x9D: rep = "N";   break;  // Н
+                    case 0x9E: rep = "O";   break;  // О
+                    case 0x9F: rep = "P";   break;  // П
+                    case 0xA0: rep = "R";   break;  // Р
+                    case 0xA1: rep = "S";   break;  // С
+                    case 0xA2: rep = "T";   break;  // Т
+                    case 0xA3: rep = "U";   break;  // У
+                    case 0xA4: rep = "F";   break;  // Ф
+                    case 0xA5: rep = "H";   break;  // Х
+                    case 0xA6: rep = "Ts";  break;  // Ц
+                    case 0xA7: rep = "Ch";  break;  // Ч
+                    case 0xA8: rep = "Sh";  break;  // Ш
+                    case 0xA9: rep = "Shh"; break;  // Щ
+                    case 0xAA: rep = "\"";  break;  // Ъ
+                    case 0xAB: rep = "Y";   break;  // Ы
+                    case 0xAC: rep = "'";   break;  // Ь
+                    case 0xAD: rep = "E";   break;  // Э
+                    case 0xAE: rep = "Yu";  break;  // Ю
+                    case 0xAF: rep = "Ya";  break;  // Я
+                    case 0xB0: rep = "a";   break;  // а
+                    case 0xB1: rep = "b";   break;  // б
+                    case 0xB2: rep = "v";   break;  // в
+                    case 0xB3: rep = "g";   break;  // г
+                    case 0xB4: rep = "d";   break;  // д
+                    case 0xB5: rep = "e";   break;  // е
+                    case 0xB6: rep = "zh";  break;  // ж
+                    case 0xB7: rep = "z";   break;  // з
+                    case 0xB8: rep = "i";   break;  // и
+                    case 0xB9: rep = "j";   break;  // й
+                    case 0xBA: rep = "k";   break;  // к
+                    case 0xBB: rep = "l";   break;  // л
+                    case 0xBC: rep = "m";   break;  // м
+                    case 0xBD: rep = "n";   break;  // н
+                    case 0xBE: rep = "o";   break;  // о
+                    case 0xBF: rep = "p";   break;  // п
+                    case 0x81: rep = "Yo";  break;  // Ё
+                }
+            } else { // c == 0xD1
+                switch (c2) {
+                    case 0x80: rep = "r";   break;  // р
+                    case 0x81: rep = "s";   break;  // с
+                    case 0x82: rep = "t";   break;  // т
+                    case 0x83: rep = "u";   break;  // у
+                    case 0x84: rep = "f";   break;  // ф
+                    case 0x85: rep = "h";   break;  // х
+                    case 0x86: rep = "ts";  break;  // ц
+                    case 0x87: rep = "ch";  break;  // ч
+                    case 0x88: rep = "sh";  break;  // ш
+                    case 0x89: rep = "shh"; break;  // щ
+                    case 0x8A: rep = "\"";  break;  // ъ
+                    case 0x8B: rep = "y";   break;  // ы
+                    case 0x8C: rep = "'";   break;  // ь
+                    case 0x8D: rep = "e";   break;  // э
+                    case 0x8E: rep = "yu";  break;  // ю
+                    case 0x8F: rep = "ya";  break;  // я
+                    case 0x91: rep = "yo";  break;  // ё
+                }
+            }
+
+            if (rep) {
+                // Копируем замену посимвольно, проверяя границы
+                size_t r = 0;
+                while (rep[r] != '\0' && j < 255) {
+                    out[j++] = rep[r++];
+                }
+                i += 2;  // пропускаем 2 байта UTF-8
+                continue;
+            }
+        }
+
+        // Неизвестный многобайтовый символ — пропускаем
+        i++;
+    }
+
+    out[j] = '\0';
+}
+
+
+// ========== Пример использования ==========
+// #include <stdio.h>
+// int main() {
+//     char in[256]  = "Привет, мир! Ёлка — это Щука.";
+//     char out[256] = {0};
+//     cyrToLat(in, out);
+//     printf("%s\n", out); 
+//     // Pryvet, mir! Yolka — eto Shhuka.
+//     return 0;
+// }
+
