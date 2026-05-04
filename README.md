@@ -13,11 +13,11 @@ Flash mod: DIO
 
 Flash frequency: 80Mhz
 
-partition scheme: NoOta 2mb APP / 2mb SPIFFS
+Partition scheme: NoOta 2mb APP / 2mb SPIFFS
 
-events run: core1
+Events run: core1
 
-arduino runs: core1
+Arduino runs: core1
 
 Upload speed: 460800 (choose max speed)
 
@@ -132,7 +132,7 @@ Displays the number of minutes left until a certain timer (in minutes, limited t
 Line structure: (minutes remaining) name
 
 
-HP - heart rate indicator
+HP - stylized heart rate indicator
 
 HP - depends on the time of day (from 8 AM to 8 PM it decreases from 420 to 80). It then returns to its maximum at 3:00 AM
 
