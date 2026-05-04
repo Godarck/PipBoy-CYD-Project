@@ -11,6 +11,8 @@
   
 Flash mod: DIO
 
+Flash frequency: 80Mhz
+
 partition scheme: NoOta 2mb APP / 2mb SPIFFS
 
 events run: core1
