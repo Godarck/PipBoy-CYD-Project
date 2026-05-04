@@ -5,7 +5,7 @@
   ![image](https://github.com/Godarck/PipBoy-CYD-Project/blob/main/Photo/IMG_20260422_123901.png)
   
 
-* ARDUINO IDE PREFERENCES:
+* ======== !!! ARDUINO IDE PREFERENCES: !!!  ======== 
   
 Flash mod: DIO
 
@@ -15,37 +15,46 @@ events run: core1
 
 arduino runs: core1
 
-Upload speed: 460800
+Upload speed: 460800 (choose max speed)
 
 PSRAM: Disabled 
 
 
-* Libraries:
+* ======== Boards: ======== 
 
-esp8266audio
+  ESP32 by Espressif Systems 3.3.7
 
-time from Michael Margolis
 
-HTTPClient
+* ======== Libraries: ======== 
 
-Arduino Json
+RTClib версии 2.1.4
 
-* Configure:
+Timezone Library by Jack Christensen  версии 1.2.6
+
+ESP8266Audio версии 2.4.1
+
+Time версии 1.6.1 by Michael Margolis
+
+Audio   Arduino library
+
+
+* ======== Configure: ======== 
   
 Config in config.h
 
 PERSON_NAME - Name in main screen
 
-DEBUGFLAG - if you need debug. Set flag true for first run.
+DEBUGFLAG - if you need debug. Set flag true for first run. Use Serial monitor to watch Debug information.
 
 GMT_SET - to set GMT region for clock
 
-password default for wifi in wifi_module.cpp (only for first use)
+Default Password for WiFI in var StandartWiFiPass in main *.ino file  (only for first use)
 
-Default folder from SD card for mp3 in RadioModule.cpp (only for first use)
+Default folder from SD card for mp3 in RadioModule.cpp  (only for first use)
 
 
-* ======= Components =========
+
+* ======== Components =========
 
 CYD: 2.4 inch ESP32-2432S024R with Resistive Touch (Only Type-C USB connector, RGB LED in front near display.)
 
@@ -91,7 +100,7 @@ Wi-Fi functions: scanning, list of networks, connecting to a selected one (must 
 HP and AP indicators are calculated automatically, depending on the time of day. During the day, they decrease. After evening, they replenish.
 
 
-* ====== on the main screen ======
+* ====== On the main screen ======
 
 Left corner: 3 states:
 
