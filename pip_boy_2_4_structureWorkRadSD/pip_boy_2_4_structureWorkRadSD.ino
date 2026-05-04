@@ -13,8 +13,17 @@ ARDUINO IDE PREFERENCES:
   Upload speed: 460800 (choose max speed)
   PSRAM: Disabled
 
-Board:
-  ESP32 by Espressif Systems 3.3.7
+* ======== Boards: ======== 
+  ESP32 by Espressif Systems            ver 3.3.7
+
+* ======== Libraries: ======== 
+  RTClib by Adafruit                    ver 2.1.4
+  Timezone Library by Jack Christensen  ver 1.2.6
+  ESP8266Audio by Early F.Philhover     ver 2.4.1
+  Time by Michael Margolis              ver 1.6.1 
+  ArduinoJson by Benoit Blanchon        ver 7.4.3 
+  TFT_eSPI by Boodmer                   ver 2.5.43
+  Adafruit BusIO by Adafruit            ver 1.17.4  
 
 Libraries : 
   Используем библиотеку Wire версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/Wire 
@@ -34,7 +43,7 @@ Libraries :
   Используем библиотеку TFT_eSPI версии 2.5.43 из папки: ///Documents/Arduino/libraries/TFT_eSPI 
   Используем библиотеку SPIFFS версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/SPIFFS 
 
-See config.h for base setup.
+* ======== See config.h for base setup.  ======== 
   PERSON_NAME - Name in main screen
   DEBUGFLAG - if you need debug. Set flag true for first run.
     Use Serial monitor to watch Debug information.
@@ -42,7 +51,7 @@ See config.h for base setup.
   Default Password for WiFI in var StandartWiFiPass in main *.ino file  (only for first use)
   Default folder from SD card for mp3 in RadioModule.cpp  (only for first use)
 
- ====== components =========
+* ====== components =========
   CYD: 2.4 inch ESP32-2432S024R with Resistive touch (Only type-c usb connector, RGB led in Front near display. )
   RTC + EEPROM :   Tyni RTC I2C module DS1307
   Connectors:      JST 1.25 4pin - for i2c bus
@@ -57,7 +66,7 @@ See config.h for base setup.
  модуль сенсора пульса (опционально) пока не реализовано
  флэшка microSD (до 32 гб, чем меньше тем лучше. оптимально - 8 гб) FAT32. С нее считывается музыка локально. Радиостанции из фалаут можно найти отдельно.
 
-====== функции ======
+* ====== функции ======
 пароль вай вай запоминает последний введенный,
 координаты GPS и выбор температры( Celsius - Farengheit) запоминает последние введенные
 
@@ -71,7 +80,7 @@ See config.h for base setup.
 Функцим WiFi: сканирование, список сетей, подключение к выбранной (Подключать надо вручную всегда)
 Индикаторы HP - AP высчитываются сами, в зависимости от врмени суток. В течение дня - уменьшаются. После вечера - восполняются.
 
-====== на главном экране ======
+* ====== на главном экране ======
 Слева в углу 3 состояния:
 в рамке - активно
 wifi - подключен ли WiFi
