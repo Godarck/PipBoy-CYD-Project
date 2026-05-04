@@ -1,0 +1,6 @@
+components:
+CYD ESP32-2432S024R 2.4" 320x240 TFT ILI9341 + Resisteve Touch 
+Module UPS for microcontroller type-c 3.3/5v 1.5A ========= need 5v
+Driver plate for flashlight XISONGXIN LIGHT1
+Tiny RTC I2C DS1307 Clock Module 24c32 32K I2C EEPROM
+Spring microswitch ELEABC 10pcs ф7mm.    DS-402
