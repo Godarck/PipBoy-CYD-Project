@@ -26,47 +26,50 @@ PSRAM: Disabled
 
 * ======== Boards: ======== 
 
-  ESP32 by Espressif Systems 3.3.7
+  ESP32 by Espressif Systems          ver 3.3.7
 
 
 * ======== Libraries: ======== 
-
-RTClib версии 2.1.4
-
-Timezone Library by Jack Christensen  версии 1.2.6
-
-ESP8266Audio версии 2.4.1
-
-Time версии 1.6.1 by Michael Margolis
-
-Audio   Arduino library
-
+  
+  RTClib by Adafruit                    ver 2.1.4
+  
+  Timezone Library by Jack Christensen  ver 1.2.6
+  
+  ESP8266Audio by Early F.Philhover     ver 2.4.1
+  
+  Time by Michael Margolis              ver 1.6.1 
+  
+  ArduinoJson by Benoit Blanchon        ver 7.4.3 
+  
+  TFT_eSPI by Boodmer                   ver 2.5.43
+  
+  Adafruit BusIO by Adafruit            ver 1.17.4  
 
 * ======== Configure: ======== 
   
-Config in config.h
-
-PERSON_NAME - Name in main screen
-
-DEBUGFLAG - if you need debug. Set flag true for first run. Use Serial monitor to watch Debug information.
-
-GMT_SET - to set GMT region for clock
-
-Default Password for WiFI in var StandartWiFiPass in main *.ino file  (only for first use)
-
-Default folder from SD card for mp3 in RadioModule.cpp  (only for first use)
+  Config in config.h
+  
+  PERSON_NAME - Name in main screen
+  
+  DEBUGFLAG - if you need debug. Set flag true for first run. Use Serial monitor to watch Debug information.
+  
+  GMT_SET - to set GMT region for clock
+  
+  Default Password for WiFI in var StandartWiFiPass in main *.ino file  (only for first use)
+  
+  Default folder from SD card for mp3 in RadioModule.cpp  (only for first use)
 
 
 
 * ======== Components =========
 
-CYD: 2.4 inch ESP32-2432S024R with Resistive Touch (Only Type-C USB connector, RGB LED in front near display.)
-
-RTC + EEPROM: Tyni RTC I2C module DS1307
-
-Connectors: JST 1.25 4-pin - for I2C bus
-
-JST 1.25 2-pin (2 pcs) - for speaker and battery
+  CYD: 2.4 inch ESP32-2432S024R with Resistive Touch (Only Type-C USB connector, RGB LED in front near display.)
+  
+  RTC + EEPROM: Tyni RTC I2C module DS1307
+  
+  Connectors: JST 1.25 4-pin - for I2C bus
+  
+  JST 1.25 2-pin (2 pcs) - for speaker and battery
 
 For the watch to work, a module with flash memory is required (the module must have two 8-pin chips) or a separate I2C flash memory card.
 
