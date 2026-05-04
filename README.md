@@ -41,7 +41,7 @@ PSRAM: Disabled
   
   ArduinoJson by Benoit Blanchon        ver 7.4.3 
   
-  TFT_eSPI by Boodmer                   ver 2.5.43
+  TFT_eSPI by Boodmer                   ver 2.5.43 (Copy user_setup.h to TFT_eSPI lib folder)
   
   Adafruit BusIO by Adafruit            ver 1.17.4  
 
