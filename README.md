@@ -5,7 +5,9 @@
   ![image](https://github.com/Godarck/PipBoy-CYD-Project/blob/main/Photo/IMG_20260422_123901.png)
   
 
-* ======== !!! ARDUINO IDE PREFERENCES: !!!  ======== 
+* ======== !!! ARDUINO IDE PREFERENCES: !!!  ========
+  
+   ===> ESP32 DEV Module - COM Port USB
   
 Flash mod: DIO
 
