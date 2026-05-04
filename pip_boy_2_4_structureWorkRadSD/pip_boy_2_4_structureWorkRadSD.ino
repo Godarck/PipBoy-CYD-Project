@@ -499,7 +499,7 @@ void loop() {
       weatherUpdate();
     }
 
-    if (!weatherHasData() || (WiFi.status() = WL_CONNECTED))
+    if (!weatherHasData() || (WiFi.status() == WL_CONNECTED))
       {
         int mins = weatherGetAgeMinutes();
         if (mins > 60)
