@@ -3,34 +3,57 @@
  * Стилизованный Pip-Boy из Fallout
 
 ARDUINO IDE PREFERENCES:
-Flash mod: DIO
-partition scheme: NoOta 2mb APP / 2mb SPIFFS
-events run: core1
-arduino runs: core1
-Upload speed: 460800
-PSRAm: Disabled
+  ESP32 DEV Module - COM Port USB
 
- libs : 
-//esp32-audioi2s-master
-esp8266audio
-time from Michael Margolis
-HTTPClient
-ArduinoJson
-// ???? not use ogg lib https://github.com/pschatzmann/codec-ogg
+  Flash mod: DIO
+  Partition scheme: NoOta 2mb APP / 2mb SPIFFS
+  Events run: core1
+  Flash frequency: 80Mhz
+  Arduino runs: core1
+  Upload speed: 460800 (choose max speed)
+  PSRAM: Disabled
 
-password default for wifi in wifi_module.cpp
-Default folder from SD card for mp3 in RadioModule.cpp
-in RadioModule.cpp pin 26 for autput audio stream
+Board:
+  ESP32 by Espressif Systems 3.3.7
+
+Libraries : 
+  Используем библиотеку Wire версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/Wire 
+  Используем библиотеку RTClib версии 2.1.4 из папки: ///Documents/Arduino/libraries/RTClib 
+  Используем библиотеку Adafruit BusIO версии 1.17.4 из папки: ///Documents/Arduino/libraries/Adafruit_BusIO 
+  Используем библиотеку Time версии 1.6.1 из папки: ///Documents/Arduino/libraries/Time 
+  Используем библиотеку Timezone версии 1.2.6 из папки: ///Documents/Arduino/libraries/Timezone 
+  Используем библиотеку WiFi версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/WiFi 
+  Используем библиотеку Networking версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/Network 
+  Используем библиотеку HTTPClient версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/HTTPClient 
+  Используем библиотеку NetworkClientSecure версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/NetworkClientSecure 
+  Используем библиотеку ArduinoJson версии 7.4.3 из папки: ///Documents/Arduino/libraries/ArduinoJson 
+  Используем библиотеку ESP8266Audio версии 2.4.1 из папки: ///Documents/Arduino/libraries/ESP8266Audio 
+  Используем библиотеку SD версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/SD 
+  Используем библиотеку FS версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/FS 
+  Используем библиотеку SPI версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/SPI 
+  Используем библиотеку TFT_eSPI версии 2.5.43 из папки: ///Documents/Arduino/libraries/TFT_eSPI 
+  Используем библиотеку SPIFFS версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/SPIFFS 
+
+See config.h for base setup.
+  PERSON_NAME - Name in main screen
+  DEBUGFLAG - if you need debug. Set flag true for first run.
+    Use Serial monitor to watch Debug information.
+  GMT_SET - to set GMT region for clock
+  Default Password for WiFI in var StandartWiFiPass in main *.ino file  (only for first use)
+  Default folder from SD card for mp3 in RadioModule.cpp  (only for first use)
 
  ====== components =========
- CYD: 2.4 inch ESP32-2432S024R with Resistive touch (Only type-c usb connector, RGB led in Front near display. )
- RTC + EEPROM :   Tyni RTC I2C module DS1307
-connectors:       JST 1.25 4pin - for i2c bus
-                  JST 1.25 2pin (2 pcs)  - for dinamic and battery
- Для работы часов нужен модульс флэшкой памяти (на модуле должно быть две 8 ногих микросхемы)/ либо флэшка памяти отдельно i2c
+  CYD: 2.4 inch ESP32-2432S024R with Resistive touch (Only type-c usb connector, RGB led in Front near display. )
+  RTC + EEPROM :   Tyni RTC I2C module DS1307
+  Connectors:      JST 1.25 4pin - for i2c bus
+                   JST 1.25 2pin (2 pcs)  - for dinamic and battery
+  Audio: 4 Omh speaker
+  Audio mp3: microSD card 1-16 GB
+
+ Для работы часов нужен модуль с флэшкой памяти (на модуле должно быть две 8 ногих микросхемы)/ либо флэшка памяти отдельно i2c
  
 
- динамик ( можно от мобильника, например с старых айфонов)
+ динамик ( можно от мобильника 4 Ом , например с старых айфонов)
  модуль сенсора пульса (опционально) пока не реализовано
  флэшка microSD (до 32 гб, чем меньше тем лучше. оптимально - 8 гб) FAT32. С нее считывается музыка локально. Радиостанции из фалаут можно найти отдельно.
 
@@ -83,7 +106,6 @@ AP - зависит от времени суток (с 8 утра до 13:00 у�
 #include "weather_module.h"
 #include "ui_module.h"
 #include "radio.h"
-//#include "radio_module.h"
 
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -304,7 +326,6 @@ void drawWeatherIconCentered(int x, int y, String condition, uint16_t color);
 void drawCurrentWeatherIconCentered(int x, int y, uint16_t color);
 
 // radio
-// Прототипы (добавь в раздел ПРОТОТИПЫ ФУНКЦИЙ
 void handleRadioSetButtons(uint16_t x, uint16_t y);
 bool checkSDPath(const char* path);
 void radioSetSDFolder(const String& folder);
@@ -477,6 +498,17 @@ void loop() {
     {
       weatherUpdate();
     }
+
+    if (!weatherHasData() || (WiFi.status() = WL_CONNECTED))
+      {
+        int mins = weatherGetAgeMinutes();
+        if (mins > 60)
+        {
+          //needUpdateScreenWeather = true;
+          weatherForceUpdate();
+          weatherUpdate();
+        }
+      }
     
     if (currentScreen == 3 && weatherHasData()) {
       if (needUpdateScreenWeather) drawPipBoyScreen3();
@@ -1779,6 +1811,7 @@ void drawPipBoyScreen3() {
     int mins = weatherGetAgeMinutes();
     if (mins > 30)
     {
+      //needUpdateScreenWeather = true;
       weatherForceUpdate();
       weatherUpdate();
     }
