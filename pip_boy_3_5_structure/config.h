@@ -55,6 +55,11 @@
 #define EEPROM_PAGE_SIZE 32
 #define EEPROM_SIZE 4096
 
+
+// ======================= BMP280 барометр =======================
+#define BMP280_ADDRESS 0x76
+
+
 // ======================= WiFi / NTP =======================
 #define NTP_SERVER "pool.ntp.org"
 #define NTP_SYNC_INTERVAL 3600      // секунд
@@ -89,7 +94,7 @@
 
 #define TAB_TEXT_SIZE 2
 #define LVL_TEXT_SIZE 3
-#define TIMERS_TEXT_SIZE 2
+#define TIMERS_TEXT_SIZE 1
 
 #define KEYBOARD_X 5
 #define KEYBOARD_Y 5
@@ -99,6 +104,10 @@
 #define KEY_W ((KEYBOARD_W - KEY_GAP * 12) / 10 )//28
 #define KEY_H ((KEYBOARD_H - KEYBOARD_Y - 28 - 22 - KEY_GAP * 14)/6 )//24 KEYBOARD_H - KEY_H - KEY_GAP - 4
 
+
+#define  SCREEN_HEADER_Y  40      // Нижняя граница заголовка "WEATHER"
+#define  SCREEN_BOTTOM_Y  (TFT_HEIGHT_SCREEN - TAB_H - 5) // Верхняя граница TAB_H
+#define  SCREEN_CONTENT_H  (SCREEN_BOTTOM_Y - SCREEN_HEADER_Y) // Доступная высота 
 
 // ================== WiFi list dimensions =============
 #define LIST_X 85

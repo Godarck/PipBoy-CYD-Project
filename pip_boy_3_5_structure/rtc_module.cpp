@@ -28,7 +28,6 @@ void debugPrint(const char* label, int value) {
 }
 
 void rtcInit() {
-  Wire.begin(RTC_SDA, RTC_SCL);
   
   Wire.beginTransmission(RTC_ADDRESS);
   if (Wire.endTransmission() != 0) {

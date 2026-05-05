@@ -24,6 +24,7 @@ ARDUINO IDE PREFERENCES:
   ArduinoJson by Benoit Blanchon        ver 7.4.3 
   TFT_eSPI by Boodmer                   ver 2.5.43
   Adafruit BusIO by Adafruit            ver 1.17.4  
+  Adafruit BMP280 Library by Adafruit   ver 3.0.0
 
 Libraries : 
   Используем библиотеку Wire версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/Wire 
@@ -115,6 +116,7 @@ AP - зависит от времени суток (с 8 утра до 13:00 у�
 #include "weather_module.h"
 #include "ui_module.h"
 #include "radio.h"
+#include "BMP280Module.h"
 
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -203,6 +205,9 @@ uint8_t parsedMinutes = 99;
 
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite sprite = TFT_eSprite(&tft);
+
+
+bool bmpFound = false;
  //SPIClass SDSPI(VSPI);
 
 setup_t user;
@@ -297,7 +302,7 @@ void drawSkillsButton(bool active);
 void drawWeatherButton(bool active);
 void drawGeneralButton(bool active);
 void drawVaultBoy(int16_t cx, int16_t cy, int8_t frame);
-void updateWeatherTimeDisplay();
+
 void drawWiFiScreen();
 void scanWiFiNetworks();
 void connectToWiFi(const char* ssid, const char* password);
@@ -313,6 +318,29 @@ void hideKeyboard();
 const char* getKeyboardInput();
 bool handleKeyboardTouch(uint16_t x, uint16_t y);
 void clearKeyboardInput();
+
+
+// bmp module barometr and temp. -- барометр и температура
+//bool bmpModuleInit();
+bool bmpInit();
+bool bmpMeasure();
+float bmpGetPressureHpa();
+float bmpGetPressureKpa();
+float bmpGetPressureMmHg();
+float bmpGetTemperatureC();
+float bmpGetTemperatureF();
+void bmpCalibrateAltitude();      // Запомнить текущее как "ноль"
+bool bmpIsCalibrated();
+float bmpGetRelativeAltitude();   // От калиброванной точки
+float bmpGetSeaLevelAltitude();   // От уровня моря
+void bmpSetSeaLevelPressure(float hpa); // Установить P моря (метео)
+
+void updateBMPScreen();
+void drawUpdateInfo();
+void drawWeatherPanel(int x, int y, int w, int h, bool isSidePanel);
+void drawBMPPanel(int x, int y, int w, int h);
+
+void updateWeatherScreen();
 
 // Часы
 void SetupDigits();
@@ -333,6 +361,7 @@ void drawWeatherIcon(int x, int y, String condition, uint16_t color);
 void drawCurrentWeatherIcon(int x, int y, uint16_t color);
 void drawWeatherIconCentered(int x, int y, String condition, uint16_t color);
 void drawCurrentWeatherIconCentered(int x, int y, uint16_t color);
+void updateWeatherScreen();
 
 // radio
 void handleRadioSetButtons(uint16_t x, uint16_t y);
@@ -523,7 +552,7 @@ void loop() {
     
     if (currentScreen == 3 && weatherHasData()) {
       if (needUpdateScreenWeather) drawPipBoyScreen3();
-      updateWeatherTimeDisplay();
+      drawUpdateInfo();
       if (weatherGetAgeMinutes() > 15)
       {
         weatherForceUpdate();
@@ -644,7 +673,7 @@ void loop() {
       ParseDigits(prevDisplay);
       DrawDigitsOneByOne();
       DrawDate(prevDisplay);
-      DrawColons();
+      //DrawColons();
       DrawAmPm();
     }
     delay(100);
@@ -790,9 +819,10 @@ void UpdateMetaData()
         tft.setTextSize(1);
         String VolumeInfo = "Volume: " + String(radioGetVolume());
         int widthtext = tft.textWidth(VolumeInfo);
-                  tft.fillRect((TFT_WIDTH_SCREEN / 2) - (widthtext/2), 148, widthtext + 5, 10, TFT_BLACK);
-                  drawScanlinesButtons((TFT_WIDTH_SCREEN / 2) - (widthtext/2), 148, 10, widthtext + 5);
-                  tft.drawString(VolumeInfo, TFT_WIDTH_SCREEN / 2, 148);
+        int cvy = SCREEN_BOTTOM_Y - 20 - TAB_H;
+                  tft.fillRect((TFT_WIDTH_SCREEN / 2) - (widthtext/2), cvy, widthtext + 5, 10, TFT_BLACK);
+                  drawScanlinesButtons((TFT_WIDTH_SCREEN / 2) - (widthtext/2), cvy, 10, widthtext + 5);
+                  tft.drawString(VolumeInfo, TFT_WIDTH_SCREEN / 2, cvy);
          // }
     }
 
@@ -926,6 +956,9 @@ void initStartUp(){
   tft.setTextColor(TFT_GREEN);
   tft.print("Loading ");
   
+
+  Wire.begin(RTC_SDA, RTC_SCL);
+
   delay(50);
   rtcInit();
   tft.print(".");
@@ -938,6 +971,8 @@ void initStartUp(){
   delay(50);
   tft.println(" ");
   initI2C();
+  
+
   if (rtcFound)
     tft.println("RTC module --------------- OK");
   else
@@ -977,6 +1012,7 @@ void initStartUp(){
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
   }
+
   tft.println(" ");
   delay(200);
   tft.setTextColor(TFT_GREEN);
@@ -988,6 +1024,25 @@ void initStartUp(){
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
   }
+
+  tft.println(" ");
+  delay(200);
+  tft.setTextColor(TFT_GREEN);
+
+  if (bmpInit())
+  {
+    tft.println("BMP module --------------- OK");
+    bmpCalibrateAltitude();
+    bmpFound = true;
+  }
+  else
+  {
+    tft.print("BMP module --------------- ");
+    tft.setTextColor(TFT_RED);
+    tft.println("ERROR");
+    bmpFound = false;
+  }
+
   tft.println(" ");
   delay(200);
   tft.setTextColor(TFT_GREEN);
@@ -1621,13 +1676,6 @@ void drawPipBoyScreen1() {
   if (DEBUGFLAG) Serial.println("[GUI] Open screen 1 : CLOCK");
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
-  
-  tft.setTextColor(TFT_GREEN);
-  tft.setTextSize(2);
-  tft.setTextDatum(TC_DATUM);
-  tft.drawString("CLOCK", TFT_WIDTH_SCREEN / 2, 10);
-  
-
   if (!clockInitialized) {
    SetupDigits();
    }
@@ -1658,13 +1706,16 @@ void drawPipBoyScreen1() {
   time_t current = now();
   prevDisplay = current;
   //DrawDate();
-  
+  tft.setTextColor(TFT_GREEN);
+  tft.setTextSize(2);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString("CLOCK", TFT_WIDTH_SCREEN / 2, 10);
   DrawDate(prevDisplay);
   DrawColons();
   ParseDigits(prevDisplay);
   DrawDigitsAtOnce();
   DrawAmPm();
-  
+  //delay(1000);
   lastScreen = currentScreen;
 }
 
@@ -1735,196 +1786,13 @@ void drawPipBoyScreen3() {
   tft.setTextDatum(TC_DATUM);
   tft.drawString("WEATHER", TFT_WIDTH_SCREEN / 2, 10);
   
-  CurrentWeather* w = weatherGetCurrent();
-  
-  if (WiFi.status() != WL_CONNECTED) 
-  {
-    weatherLoadFromEEPROM();
-  }
-
-  if (!weatherHasData()) {
-    tft.setTextColor(TFT_RED);
-    tft.setTextSize(1);
-
-    tft.fillRect((TFT_WIDTH_SCREEN - TFT_HEIGHT_SCREEN) / 2, 80, TFT_HEIGHT_SCREEN, 80, TFT_BLACK);
-    tft.drawRect((TFT_WIDTH_SCREEN - TFT_HEIGHT_SCREEN) / 2, 80, TFT_HEIGHT_SCREEN, 80, TFT_GREEN);
-    tft.drawString("No weather data", TFT_WIDTH_SCREEN / 2, 110);
-    if (WiFi.status() != WL_CONNECTED) 
-      tft.drawString("Connect WiFi", TFT_WIDTH_SCREEN / 2, 130);
-    else
-    {
-      tft.setTextColor(TFT_GREEN);
-      tft.drawString("Loading ...", TFT_WIDTH_SCREEN / 2, 120);
-      //weatherForceUpdate();
-    }
-    needUpdateScreenWeather = true;
-    //weatherUpdate();
-    drawTabButtons();
-    lastScreen = currentScreen;
-    return;
-  }
+  updateWeatherScreen();
   
   drawTabButtons();
-  needUpdateScreenWeather = false;
-  // Температура со знаком
-  tft.setTextDatum(TC_DATUM);
-  tft.setTextColor(TFT_GREEN);
-  tft.setTextSize(6);
-  
-  int tempVal = w->temperature.toInt();
-  String unit = weatherCelsius ? "C" : "F";
-  unit =  " " + unit; // "\xB0"
-  String tempDisplay;
-  
-  if (tempVal > 0) {
-    tempDisplay = "+" + w->temperature + unit;
-  } else if (tempVal < 0) {
-    tempDisplay = "-" + w->temperature + unit;
-  } else {
-    tempDisplay = "0" + unit;
-  }
-  
-  tft.drawString(tempDisplay, TFT_WIDTH_SCREEN / 2, 40);
-  int Widthstr = tft.textWidth(tempDisplay);
-
-  if (DEBUGFLAG) Serial.printf("[GUI - Weather] Text width '%s' is: %d\n", tempDisplay, Widthstr);
-  tft.drawCircle((TFT_WIDTH_SCREEN/2) + (Widthstr/2) - 50 , 45, 6, TFT_GREEN);
-  tft.drawCircle((TFT_WIDTH_SCREEN/2) + (Widthstr/2) - 50, 45, 5, TFT_GREEN);
-  tft.drawCircle((TFT_WIDTH_SCREEN/2) + (Widthstr/2) - 50, 45, 4, TFT_GREEN);
-  
-  // Условия
-  //tft.setTextSize(2);
-  //tft.drawString(w->condition, TFT_WIDTH_SCREEN / 2, 110);
-  
-  drawWeatherIconCentered(TFT_WIDTH_SCREEN / 2, 110, w->condition, TFT_GREEN);
-  // Ветер со стрелкой
-  tft.setTextSize(1);
-  tft.setTextDatum(TL_DATUM);
-  tft.setCursor(60, 145);
-  tft.print("Wind: ");
-  // Использование вместо текста:
-  drawWindArrow(110, 148, w->windDir, 20, TFT_WHITE);
-
-  tft.setCursor(130, 145);
-  //tft.print(w->windDir);
-  //tft.print("   ");
-  tft.print(w->wind);
-  tft.print(" km/h");
-  
-  // Координаты
-  tft.setCursor(60, 170);
-  tft.print("Coords: ");
-  tft.print(weatherLat.substring(0, 6));
-  tft.print(", ");
-  tft.print(weatherLon.substring(0, 6));
-  
-  // Время обновления (placeholder, обновляется отдельно)
-  tft.setCursor(60, 190);
-  tft.print("Updated: ");
-  updateWeatherTimeDisplay();
-  
-  if (!weatherHasData() || (WiFi.status() != WL_CONNECTED))
-  {
-    int mins = weatherGetAgeMinutes();
-    if (mins > 30)
-    {
-      //needUpdateScreenWeather = true;
-      weatherForceUpdate();
-      weatherUpdate();
-    }
-  }
-  // Индикатор источника
-  tft.setTextSize(1);
-  tft.setTextDatum(TR_DATUM);
-  tft.setTextColor(tft.color565(0, 100, 0));
-  String src = (w->source == WEATHER_PRIMARY) ? "[W]" : 
-               (w->source == WEATHER_OPENMETEO) ? "[O]" : "[E]";
-  tft.drawString(src, 310, 35);
-  //drawTabButtons();
+ 
   lastScreen = currentScreen;
 }
 
-void updateWeatherTimeDisplay() {
-  CurrentWeather* w = weatherGetCurrent();
-  if (!weatherHasData()) return;
-  
-  int mins = weatherGetAgeMinutes();
-  if (mins < 0) return;
-  
-  bool isOld = (mins > 60);
-
-  String stringw = "";
-
-  if (isOld) 
-  {
-    if (weatherLastUpdate())
-    {
-      time_t dateUpW = weatherLastUpdate();
-      time_t local = myTZ.toLocal(dateUpW, &tcr);
-      stringw = pad2(day(local)) + "." + pad2(month(local)) + "." + String(year(local)) + " " + pad2(hour(local)) + ":" + pad2(minute(local));
-    }
-    else
-    {
-      mins = 60;
-      stringw = String(mins); 
-    }
-  }
-  
-  // Координаты поля времени
-  int timeX = 60 + 54;  // После "Updated: "
-  int timeY = 190;
-  int timeW = 100;
-  int timeH = 12;
-  
-  // Закрасить старое значение
-  tft.fillRect(timeX, timeY - 2, timeW + 30, timeH, TFT_BLACK); 
-  drawScanlinesButtons(timeX, timeY - 2, timeH, timeW + 30);
-  // Новое значение
-  tft.setTextDatum(TL_DATUM);
-  tft.setTextSize(1);
-  tft.setTextColor(isOld ? TFT_ORANGE : TFT_GREEN);
-  tft.setCursor(timeX, timeY);
-  
-
-  if (WiFi.status() == WL_CONNECTED) {
-    if (!isOld)
-    {
-      tft.print(mins);
-      tft.print(" min ago");
-    }
-    else
-      tft.print(stringw);
-  } else {
-    if (!isOld)
-    {
-      tft.print(mins);
-      tft.print(" min ago");
-      tft.print(" (WiFi OFF)");
-    }
-    else
-    {
-      tft.print(stringw);
-      tft.print(" (WiFi OFF)");
-    }
-  }
-  
-  // Индикатор источника
-  tft.setTextSize(1);
-  tft.setTextDatum(TR_DATUM);
-  tft.setTextColor(tft.color565(0, 100, 0));
-  // Закрасить старое значение
-  tft.fillRect(280, 20, 40, 20, TFT_BLACK); 
-  drawScanlinesButtons(280, 20, 24, 40);
-  String src = (w->source == WEATHER_PRIMARY) ? "[W]" : 
-               (w->source == WEATHER_OPENMETEO) ? "[O]" : "[E]";
-  tft.drawString(src, 310, 35);
-  // Предупреждение о старых данных
-  //if (isOld) {
-  //  tft.setTextColor(TFT_RED);
-  //  tft.setCursor(60, 215);
-   // tft.print("Data expired!     ");
-  //}
-}
 
 
 // ======================= ЭКРАН 4: GENERAL =======================
@@ -2964,3 +2832,415 @@ String pad2(uint8_t val)
 {
   return (val < 10 ? "0" :"") + String(val);
 }
+
+
+
+void updateWeatherScreen()
+{
+  // Очищаем всю область контента
+  //tft.fillRect(0, SCREEN_HEADER_Y, TFT_WIDTH_SCREEN, SCREEN_CONTENT_H, TFT_BLACK);
+  
+  // --- РЕЖИМ без BMP — погода по центру экрана ---
+  if (!bmpFound) {
+    drawWeatherPanelCenter(TFT_WIDTH_SCREEN / 2, SCREEN_HEADER_Y, TFT_WIDTH_SCREEN, SCREEN_CONTENT_H);
+    drawUpdateInfo();
+    //drawTabButtons();
+    //lastScreen = currentScreen;
+    return;
+  }
+  
+  // --- РЕЖИМ с BMP — две панели по половине экрана ---
+  int panelW = TFT_WIDTH_SCREEN / 2;  // Половина ширины экрана
+  int panelH = SCREEN_CONTENT_H;
+  int leftX = 0;
+  int rightX = panelW;                 // Вторая половина начинается здесь
+  
+  // Левая панель (BMP) — от 0 до TFT_WIDTH_SCREEN/2
+  tft.drawRect(leftX, SCREEN_HEADER_Y, panelW, panelH, TFT_GREEN);
+  drawBMPPanel(leftX, SCREEN_HEADER_Y, panelW, panelH);
+  
+  // Правая панель (Weather) — от TFT_WIDTH_SCREEN/2 до TFT_WIDTH_SCREEN
+  tft.drawRect(rightX, SCREEN_HEADER_Y, panelW, panelH, TFT_GREEN);
+  drawWeatherPanelSide(rightX, SCREEN_HEADER_Y, panelW, panelH);
+  
+  // Updated — по центру всего экрана, под рамками
+  drawUpdateInfo();
+  
+  //drawTabButtons();
+  //lastScreen = currentScreen;
+}
+
+
+// ============================================================
+// ЛЕВАЯ ПАНЕЛЬ — BMP данные
+// ============================================================
+
+void drawWeatherPanelCenter(int cx, int y, int w, int h)
+{
+  if (WiFi.status() != WL_CONNECTED) {
+    weatherLoadFromEEPROM();
+  }
+  
+  if (!weatherHasData()) {
+    int boxW = 200;
+    int boxH = 80;
+    int boxX = cx - boxW / 2;       // Центрируем бокс
+    int boxY = y + h / 2 - boxH / 2;
+    
+    tft.fillRect(boxX, boxY, boxW, boxH, TFT_BLACK);
+    tft.drawRect(boxX, boxY, boxW, boxH, TFT_GREEN);
+    
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_RED);
+    tft.setTextSize(1);
+    tft.drawString("No weather data", cx, boxY + boxH / 2 - 10);
+    
+    if (WiFi.status() != WL_CONNECTED) {
+      tft.setTextColor(TFT_RED);
+      tft.drawString("Connect WiFi", cx, boxY + boxH / 2 + 10);
+    } else {
+      tft.setTextColor(TFT_GREEN);
+      tft.drawString("Loading...", cx, boxY + boxH / 2 + 10);
+      needUpdateScreenWeather = true;
+    }
+    return;
+  }
+  
+  needUpdateScreenWeather = false;
+  CurrentWeather* weatherPtr = weatherGetCurrent();
+  
+  // --- Температура крупно (size 6) ---
+  int tempVal = weatherPtr->temperature.toInt();
+  String unit = weatherCelsius ? "C" : "F";
+  unit = " " + unit;
+  String tempDisplay;
+  
+  if (tempVal > 0) {
+    tempDisplay = "+" + weatherPtr->temperature + unit;
+  } else if (tempVal < 0) {
+    tempDisplay = "-" + weatherPtr->temperature + unit;
+  } else {
+    tempDisplay = "0" + unit;
+  }
+  
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(TFT_GREEN);
+  tft.setTextSize(6);
+  int tw = tft.textWidth("+88 C");
+  int th = tft.fontHeight();
+  int sx = cx - tw / 2;
+      tft.fillRect(sx, y, tw, th, TFT_BLACK);
+      drawScanlinesButtons(sx, y, th, tw);
+  tft.drawString(tempDisplay, cx, y);   // cx = TFT_WIDTH_SCREEN / 2
+  
+  int Widthstr = tft.textWidth(tempDisplay);
+  int circleX = cx + Widthstr / 2 - 50;     // Смещение от центра
+  int circleY = y + 5;
+  for (int r = 6; r >= 4; r--) {
+    tft.drawCircle(circleX, circleY, r, TFT_GREEN);
+  }
+     
+  // --- Иконка погоды ---
+  //tft.drawString(tempDisplay, cx, tempY);
+  drawWeatherIconCentered(cx, y + 70, weatherPtr->condition, TFT_GREEN);
+
+  tft.setTextSize(1);
+  tft.setTextDatum(TL_DATUM);
+
+  // --- Ветер — смещение от центра на половину ширины текста ---
+  tw = tft.textWidth("Wind:     188 km/h");
+  int windX = cx - tw/ 2;
+  int windY = ((SCREEN_BOTTOM_Y - y - th - 50)) + (SCREEN_BOTTOM_Y - (SCREEN_BOTTOM_Y - y - th - 50)) / 2 - (16 + 20) / 2;// + 125;
+
+  // --- Координаты --- 
+  String crdStr = "Coords: " + String(weatherLat.substring(0, 7)) + ", " + String(weatherLon.substring(0, 7));
+  tw = tft.textWidth(crdStr);
+  int coordX = (TFT_WIDTH_SCREEN - tw) / 2;
+  int coordY = windY + 20;
+      tft.fillRect(coordX, windY - 7, tw, 35, TFT_BLACK);
+      drawScanlinesButtons(coordX, windY - 7, 35, tw);
+
+  tft.drawString("Wind:      " + String(weatherPtr->wind.c_str()) + " km/h",windX, windY);
+  drawWindArrow(windX + 30, windY + 3, weatherPtr->windDir, 20, TFT_WHITE);
+  tft.drawString(crdStr,coordX, coordY);
+ 
+  //tft.setCursor(cx - halfW / 2 + 20, coordY);
+  //tft.print("Coords: ");
+  //tft.print(weatherLat.substring(0, 7));
+  //tft.print(", ");
+  //tft.print(weatherLon.substring(0, 7));
+  
+  // --- Проверка устаревания ---
+  if (!weatherHasData() || (WiFi.status() != WL_CONNECTED)) {
+    int mins = weatherGetAgeMinutes();
+    if (mins > 30) {
+      weatherForceUpdate();
+      weatherUpdate();
+    }
+  }
+}
+
+void drawWeatherPanelSide(int x, int y, int w, int h)
+{
+  int cx = x + w / 2;     // Центр правой панели = TFT_WIDTH_SCREEN * 3/4
+  int halfW = w / 2;      // Половина ширины панели
+  
+  if (WiFi.status() != WL_CONNECTED) {
+    weatherLoadFromEEPROM();
+  }
+  
+  if (!weatherHasData()) {
+    int boxW = w - 10;
+    int boxH = 80;
+    int boxX = x + 5;
+    int boxY = y + h / 2 - boxH / 2;
+    
+    tft.fillRect(boxX, boxY, boxW, boxH, TFT_BLACK);
+    tft.drawRect(boxX, boxY, boxW, boxH, TFT_GREEN);
+    
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_RED);
+    tft.setTextSize(1);
+    tft.drawString("No weather data", cx, boxY + boxH / 2 - 10);
+    
+    if (WiFi.status() != WL_CONNECTED) {
+      tft.drawString("Connect WiFi", cx, boxY + boxH / 2 + 10);
+    } else {
+      tft.setTextColor(TFT_GREEN);
+      tft.drawString("Loading...", cx, boxY + boxH / 2 + 10);
+      needUpdateScreenWeather = true;
+    }
+    return;
+  }
+  
+  needUpdateScreenWeather = false;
+  CurrentWeather* weatherPtr = weatherGetCurrent();
+  
+  // --- Температура (size 3, компактно) ---
+  int tempVal = weatherPtr->temperature.toInt();
+  String unit = weatherCelsius ? "C" : "F";
+  unit = " " + unit;
+  String tempDisplay;
+  
+  if (tempVal > 0) {
+    tempDisplay = "+" + weatherPtr->temperature + unit;
+  } else if (tempVal < 0) {
+    tempDisplay = "-" + weatherPtr->temperature + unit;
+  } else {
+    tempDisplay = "0" + unit;
+  }
+  
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(TFT_GREEN);
+  tft.setTextSize(3);
+  int tempY = y + 30;
+  tft.drawString(tempDisplay, cx, tempY);
+  
+  int Widthstr = tft.textWidth(tempDisplay);
+  int circleX = cx + Widthstr / 2 - 25;
+  int circleY = tempY + 3;
+  for (int r = 4; r >= 2; r--) {
+    tft.drawCircle(circleX, circleY, r, TFT_GREEN);
+  }
+  
+  // --- Иконка погоды ---
+  drawWeatherIconCentered(cx, y + 65, weatherPtr->condition, TFT_GREEN);
+  
+  // --- Ветер — относительно левого края панели ---
+  int windY = y + 100;
+  tft.setTextSize(1);
+  tft.setTextDatum(TL_DATUM);
+  tft.setCursor(x + 5, windY);          // Отступ от левого края панели
+  tft.print("Wind: ");
+  drawWindArrow(x + halfW, windY + 3, weatherPtr->windDir, 15, TFT_WHITE);
+  tft.setCursor(x + halfW + 20, windY);
+  tft.printf("%s km/h", weatherPtr->wind.c_str());
+  
+  // --- Координаты ---
+  int coordY = windY + 25;
+  tft.setCursor(x + 5, coordY);
+  tft.print("Coords: ");
+  tft.print(weatherLat.substring(0, 6));
+  tft.print(", ");
+  tft.print(weatherLon.substring(0, 6));
+  
+  // --- Проверка устаревания ---
+  if (!weatherHasData() || (WiFi.status() != WL_CONNECTED)) {
+    int mins = weatherGetAgeMinutes();
+    if (mins > 30) {
+      weatherForceUpdate();
+      weatherUpdate();
+    }
+  }
+}
+
+void drawBMPPanel(int x, int y, int w, int h)
+{
+  if (!bmpMeasure()) return;
+  
+  int cx = x + w / 2;     // Центр левой панели = TFT_WIDTH_SCREEN / 4
+  int halfW = w / 2;
+  int pad = 5;
+  
+  // Иконка
+  //drawWeatherIconCentered(cx, y + 20, "indoor", TFT_GREEN);
+  
+  // Температура крупно
+  float temp = bmpGetTemperatureC();
+  String tempStr = String(temp, 1);
+  if (temp > 0) tempStr = "+" + tempStr;
+  
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(TFT_GREEN);
+  tft.setTextSize(4);
+  tft.drawString(tempStr, cx, y + 45);
+  
+  int tw = tft.textWidth(tempStr);
+  tft.drawCircle(cx + tw / 2 + 8, y + 48, 5, TFT_GREEN);
+  
+  // "INDOOR"
+  tft.setTextSize(1);
+  tft.setTextColor(tft.color565(0, 150, 0));
+  tft.drawString("INDOOR", cx, y + 75);
+  
+  // Разделитель
+  int lineY = y + 90;
+  tft.drawLine(x + pad, lineY, x + w - pad, lineY, tft.color565(0, 80, 0));
+  
+  // Данные мелким шрифтом
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(TFT_GREEN);
+  tft.setTextSize(1);
+  
+  int rowY = lineY + 10;
+  int rowH = 16;
+  int labelX = x + pad + 2;         // От левого края панели
+  int valueX = x + halfW + 5;      // Правая половина панели
+  
+  tft.setCursor(labelX, rowY);
+  tft.print("Pressure:");
+  tft.setCursor(valueX, rowY);
+  tft.printf("%.1f mmHg", bmpGetPressureMmHg());
+  rowY += rowH;
+  
+  tft.setCursor(labelX, rowY);
+  tft.print("Pressure:");
+  tft.setCursor(valueX, rowY);
+  tft.printf("%.2f kPa", bmpGetPressureKpa());
+  rowY += rowH;
+  
+  tft.setCursor(labelX, rowY);
+  tft.print("Altitude:");
+  tft.setCursor(valueX, rowY);
+  tft.printf("%+.1f m", bmpGetRelativeAltitude());
+  rowY += rowH;
+  
+  tft.setCursor(labelX, rowY);
+  tft.print("Sea level:");
+  tft.setCursor(valueX, rowY);
+  tft.printf("%.1f m", bmpGetSeaLevelAltitude());
+}
+
+
+// ============================================================
+// Время обновления — под рамками, над TAB_H
+// ============================================================
+void drawUpdateInfo()
+{
+
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextColor(tft.color565(0, 100, 0));
+  tft.setTextSize(1);
+  
+  int tw = tft.textWidth("Updated: 88.88.8888 88:88 (WIFI OFF)");
+  int th = tft.fontHeight();
+  int cx = (TFT_WIDTH_SCREEN - tw) / 2;
+  int cy = SCREEN_BOTTOM_Y - 10;
+      tft.fillRect(cx, cy, tw, th, TFT_BLACK);
+      drawScanlinesButtons(cx, cy, th, tw);
+      
+  //String WeUpStr = "Updated: " + 
+  tft.setCursor(cx, cy);
+  tft.print("Updated: ");
+ // updateWeatherTimeDisplay();  // Твоя существующая функция
+//}
+
+
+//void updateWeatherTimeDisplay() {
+  CurrentWeather* w = weatherGetCurrent();
+  if (!weatherHasData()) return;
+  
+  int mins = weatherGetAgeMinutes();
+  if (mins < 0) return;
+  
+  bool isOld = (mins > 60);
+
+  String stringw = "";
+
+  if (isOld) 
+  {
+    if (weatherLastUpdate())
+    {
+      time_t dateUpW = weatherLastUpdate();
+      time_t local = myTZ.toLocal(dateUpW, &tcr);
+      stringw = pad2(day(local)) + "." + pad2(month(local)) + "." + String(year(local)) + " " + pad2(hour(local)) + ":" + pad2(minute(local));
+    }
+    else
+    {
+      mins = 60;
+      stringw = String(mins); 
+    }
+  }
+  
+  // Координаты поля времени
+  int timeX = cx + 54;//(TFT_WIDTH_SCREEN/2) - 100 + 54;  // После "Updated: "
+  int timeY = cy; //190;
+  //int timeW = 100;
+  //int timeH = 12;
+  
+  tft.setTextColor(isOld ? TFT_ORANGE : TFT_GREEN);
+  tft.setCursor(timeX, timeY);
+  
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!isOld)
+    {
+      tft.print(mins);
+      tft.print(" min ago");
+    }
+    else
+      tft.print(stringw);
+  } else {
+    if (!isOld)
+    {
+      tft.print(mins);
+      tft.print(" min ago");
+      tft.print(" (WiFi OFF)");
+    }
+    else
+    {
+      tft.print(stringw);
+      tft.print(" (WiFi OFF)");
+    }
+  }
+  
+  // Индикатор источника
+  tft.setTextSize(1);
+  tft.setTextDatum(TR_DATUM);
+  tft.setTextColor(tft.color565(0, 100, 0));
+  // Закрасить старое значение
+  tft.fillRect(TFT_WIDTH_SCREEN - 20, 20, 40, 20, TFT_BLACK); 
+  drawScanlinesButtons(TFT_WIDTH_SCREEN - 20, 20, 24, 40);
+  String src = (w->source == WEATHER_PRIMARY) ? "[W]" : 
+               (w->source == WEATHER_OPENMETEO) ? "[O]" : "[E]";
+  tft.drawString(src, TFT_WIDTH_SCREEN - 20, 35);
+  // Предупреждение о старых данных
+  //if (isOld) {
+  //  tft.setTextColor(TFT_RED);
+  //  tft.setCursor(60, 215);
+   // tft.print("Data expired!     ");
+  //}
+  
+}
+
+
