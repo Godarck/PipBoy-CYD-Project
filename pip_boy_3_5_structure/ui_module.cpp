@@ -18,6 +18,7 @@ extern void drawPipBoyScreen3();
 extern void drawPipBoyScreen4();
 extern void drawButtonsScreen4();
 extern void drawTabButtons();
+extern void clickBuzzerKey();
 
 // Состояние клавиатуры
 bool keyboardActive = false;
@@ -245,6 +246,7 @@ bool handleKeyboardTouch(uint16_t x, uint16_t y) {
       // Визуальный отклик
       drawKey(k, true);
       delay(100);
+      clickBuzzerKey();
       drawKey(k, false);
       
       switch (k->type) {

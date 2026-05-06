@@ -30,7 +30,10 @@ void debugPrint(const char* label, int value) {
 void rtcInit() {
   
   Wire.beginTransmission(RTC_ADDRESS);
-  if (Wire.endTransmission() != 0) {
+    int wrtrs = Wire.endTransmission();
+
+    Serial.printf("[WIRE] RTC wire = %d\n", wrtrs);
+  if (wrtrs != 0) {
     if (DEBUGFLAG) Serial.println("RTC not found!");
     rtcFound = false;
     return;

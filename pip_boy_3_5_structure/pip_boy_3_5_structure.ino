@@ -117,6 +117,7 @@ AP - зависит от времени суток (с 8 утра до 13:00 у�
 #include "ui_module.h"
 #include "radio.h"
 #include "BMP280Module.h"
+#include "pulse_sensor.h"
 
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -191,7 +192,7 @@ int clockSize = 6;
 int clockDatum = TL_DATUM;
 uint16_t clockBackgroundColor = TFT_BLACK;
 uint16_t clockFontColor = TFT_GREEN; // Зелёный для Pip-Boy стиля!
-int timeY = 40; // Позиция часов на экране
+int timeY = SCREEN_CONTENT_H / 3; // Позиция часов на экране
 
 int prevDay = 0;
 
@@ -206,8 +207,12 @@ uint8_t parsedMinutes = 99;
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite sprite = TFT_eSprite(&tft);
 
-
+// BMP
 bool bmpFound = false;
+
+// PULSE SENSOR
+bool pulseSensFound = false;
+
  //SPIClass SDSPI(VSPI);
 
 setup_t user;
@@ -227,8 +232,8 @@ bool editlon = false;
 
 int currentHP = 420;
 int currentAP = 420;
-int apMax = 420;   // Максимум AP (можно менять, например, при прокачке персонажа)
-int hpMax = 420;   // Максимум HP
+int apMax = 210;   // Максимум AP (можно менять, например, при прокачке персонажа)
+int hpMax = 320;   // Максимум HP
 
 
 // === RADIO SETTINGS ===
@@ -399,6 +404,15 @@ void connectToWiFi(const char* ssid, const char* password);
 void wifiDisconnect();
 bool wifiIsConnected();
 
+// Buzzer
+void geigerTick(int level);
+void startBuzzer();
+void sweepTone(int startFreq, int endFreq, int durationMs, int stepMs);
+void clackBuzzer();
+void clickBuzzer();
+bool pulseSensorUpdate();
+void clickBuzzerKey();
+
 // ======================= SETUP =======================
 void setup() {
   Serial.begin(115200);
@@ -480,12 +494,19 @@ void setup() {
   tft.fillScreen(TFT_BLACK);
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
+  pinMode(BUZZER_PIN, OUTPUT);
+  randomSeed(analogRead(0)); // или randomSeed(millis())
 
   tft.setTouch(calData);
 
-      // Инициализация модулей
+  //проверка настроек дисплея
   if (DEBUGFLAG) ShowTFTUserSetup();
 
+  
+  // Запускаем сразу для теста
+  //pipboyBootSound();
+
+      // Инициализация модулей
   initStartUp();
   // Спрайт для часов
   tft.setTextFont(clockFont);
@@ -529,6 +550,25 @@ void loop() {
 
   //radioLoop();
   //radioLoop();
+  geigerTick(vaultFrame);
+  static unsigned long lastBpmUpdate = 0;
+  
+  static unsigned long lastHPAPUpdate = 0;
+  if (pulseSensFound)
+  {
+        //pulse.update();
+        
+        if (millis() - lastBpmUpdate > 200) {
+            lastBpmUpdate = millis();    
+          pulseSensorUpdate();
+        }
+
+        
+  }
+  if (millis() - lastHPAPUpdate > 1000) {
+            lastHPAPUpdate = millis();
+            updateHPAP();
+  }
 
   // Обновление времени погоды каждую минуту
   static unsigned long lastTimeUpdate = 0;
@@ -843,7 +883,9 @@ void ShowTFTUserSetup()
 }
 else if (user.tft_driver == 0xE9D) Serial.println("Display driver = ePaper\n");
 
-if (user.pin_tft_mosi == 13) { Serial.print("MOSI        OK = ");   Serial.print(getPinName(user.pin_tft_mosi)); } else { Serial.print("MOSI        = ERROR , NEED 13  | But define is = "); Serial.print(getPinName(user.pin_tft_mosi));}
+if (user.tft_driver == 7796) { Serial.print("ST7796_DRIVER  OK"); } else { Serial.print("ST7796_DRIVER      ERROR! , UNCOMENT #define ST7796_DRIVER");}
+
+if (user.pin_tft_mosi == 13) { Serial.print("\nMOSI        OK = "); Serial.print(getPinName(user.pin_tft_mosi)); } else { Serial.print("\nMOSI        = ERROR , NEED 13  | But define is = "); Serial.print(getPinName(user.pin_tft_mosi));}
 if (user.pin_tft_miso == 12) { Serial.print("\nMISO        OK = "); Serial.print(getPinName(user.pin_tft_miso)); } else { Serial.print("\nMISO        = ERROR , NEED 12  | But define is = "); Serial.print(getPinName(user.pin_tft_miso));}
 if (user.pin_tft_clk  == 14) { Serial.print("\nSCLK        OK = "); Serial.print(getPinName(user.pin_tft_clk)); } else {  Serial.print("\nSCLK        = ERROR , NEED 14  | But define is = "); Serial.print(getPinName(user.pin_tft_clk));}
 if (user.pin_tft_dc   == 2 ) { Serial.print("\nDC          OK = "); Serial.print(getPinName(user.pin_tft_dc)); } else {   Serial.print("\nDC          = ERROR , NEED 2   | But define is = "); Serial.print(getPinName(user.pin_tft_dc));}
@@ -904,10 +946,12 @@ void initI2C()
   tft.println(" ");
   delay(20);
   for (address = 0x01; address < 0x7f; address++) {
+    
     Wire.beginTransmission(address);
     error = Wire.endTransmission();
     if (error == 0) {
       tft.setTextColor(TFT_GREEN);
+      clackBuzzer();
       if (DEBUGFLAG) Serial.printf("I2C device found at address 0x%02X\n", address);
       tft.printf("I2C device found at address 0x%02X\n", address);
       tft.println(" ");
@@ -915,6 +959,7 @@ void initI2C()
       nDevices++;
     } else if (error != 2) {
       tft.setTextColor(TFT_RED);
+      clackBuzzer();
       if (DEBUGFLAG) Serial.printf("Error %d at address 0x%02X\n", error, address);
       tft.printf("Error %d at address 0x%02X\n", error, address);
       tft.println(" ");
@@ -937,12 +982,14 @@ void initStartUp(){
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
   tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80)/2, logovt180x80, 180, 80, tft.color565(0, 80, 0));
-  delay(150);
+  startBuzzer();
   tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80)/2, logovt180x80, 180, 80, tft.color565(0, 180, 0));
   delay(350);
   tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80)/2, logovt180x80, 180, 80, TFT_GREEN);
   delay(150);
   tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80)/2, logovt180x80, 180, 80, tft.color565(0, 180, 0));
+
+  sweepTone(15800, 20000, 200, 3);
    drawScanlines();
   delay(100);
   //tft.color565(0, 180, 0)
@@ -972,12 +1019,36 @@ void initStartUp(){
   tft.println(" ");
   initI2C();
   
-
-  if (rtcFound)
-    tft.println("RTC module --------------- OK");
+  //pinMode(PULSE_SENSOR_VCC, OUTPUT);
+  
+  //digitalWrite(PULSE_SENSOR_VCC, HIGH);
+  //delay(200);
+  pulse.begin();
+  clackBuzzer();
+if (pulse.isConnected())
+{
+    tft.println("PULSE SENSOR module -------- OK");
+    pulseSensFound = true;
+    //digitalWrite(PULSE_SENSOR_VCC, LOW);
+}
   else
   {
-    tft.print("RTC module --------------- ");
+    tft.print("PULSE SENSOR module  -------- ");
+    tft.setTextColor(TFT_RED);
+    tft.println("ERROR");
+    pulseSensFound = false;
+    //digitalWrite(PULSE_SENSOR_VCC, LOW);
+  }
+  tft.println(" ");
+  delay(200);
+  tft.setTextColor(TFT_GREEN);
+  
+  clackBuzzer();
+  if (rtcFound)
+    tft.println("RTC module ----------------- OK");
+  else
+  {
+    tft.print("RTC module ----------------- ");
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
   }
@@ -985,17 +1056,37 @@ void initStartUp(){
   delay(200);
   tft.setTextColor(TFT_GREEN);
   
+
+  clackBuzzer();
+  if (bmpInit())
+  {
+    tft.println("BMP module ----------------- OK");
+    bmpCalibrateAltitude();
+    bmpFound = true;
+  }
+  else
+  {
+    tft.print("BMP module ----------------- ");
+    tft.setTextColor(TFT_RED);
+    tft.println("ERROR");
+    bmpFound = false;
+  }
+  tft.println(" ");
+  delay(200);
+  tft.setTextColor(TFT_GREEN);
+
+  clackBuzzer();
   if (eepromFound)
   {
-    tft.println("EEPROM module ------------ OK");
+    tft.println("EEPROM module -------------- OK");
     tft.println(" ");
     if (LoadBackUpFromEPPR())
     {
-      tft.println("BACKUP LOAD -------------- OK");
+      tft.println("BACKUP LOAD ---------------- OK");
     }
     else
     {
-      tft.print("BACKUP LOAD -------------- ");
+      tft.print("BACKUP LOAD ---------------- ");
       tft.setTextColor(TFT_RED);
       tft.println("ERROR");
       SaveBackUpToEPPR();
@@ -1003,24 +1094,25 @@ void initStartUp(){
   }
   else
   {
-    tft.print("EEPROM module ------------ ");
+    tft.print("EEPROM module -------------- ");
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
     tft.setTextColor(TFT_GREEN);
     tft.println(" ");
-    tft.print("BACKUP LOAD -------------- ");
+    tft.print("BACKUP LOAD ---------------- ");
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
   }
 
+  clackBuzzer();
   tft.println(" ");
   delay(200);
   tft.setTextColor(TFT_GREEN);
   if (weatherLoadFromEEPROM())
-    tft.println("WEATHER backup module ---- OK");
+    tft.println("WEATHER backup module ------ OK");
   else
   {
-    tft.print("WEATHER backup module ---- ");
+    tft.print("WEATHER backup module ------ ");
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
   }
@@ -1028,38 +1120,21 @@ void initStartUp(){
   tft.println(" ");
   delay(200);
   tft.setTextColor(TFT_GREEN);
-
-  if (bmpInit())
-  {
-    tft.println("BMP module --------------- OK");
-    bmpCalibrateAltitude();
-    bmpFound = true;
-  }
-  else
-  {
-    tft.print("BMP module --------------- ");
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
-    bmpFound = false;
-  }
-
-  tft.println(" ");
-  delay(200);
-  tft.setTextColor(TFT_GREEN);
-  tft.println("Wi-Fi module ------------- OK");
+  tft.println("Wi-Fi module --------------- OK");
 
   tft.println(" ");
   delay(200);
   tft.setTextColor(TFT_GREEN);
 
-  tft.println("KEYBOARD module ---------- OK");
+  tft.println("KEYBOARD module ------------ OK");
 
 
   radioInit();  // Инициализация радио
 
+  clackBuzzer();
   tft.println(" ");
   delay(200);
-  tft.print("SD card ------------------ ");
+  tft.print("SD card -------------------- ");
   if (sdCardInitialized)
     tft.println("OK");
   else
@@ -1075,20 +1150,25 @@ void initStartUp(){
   tft.println(" ");
   delay(200);
   tft.setTextColor(TFT_GREEN);
-  tft.print("RGB module ---------");
+  tft.print("RGB module -----------");
   delay(200);
   tft.print("--");
   digitalWrite(LED_R, LOW); delay(200);
+  clackBuzzer();
   digitalWrite(LED_R, HIGH); 
-  delay(200);
+  delay(100);
+
   tft.print("--");
   digitalWrite(LED_G, LOW);  delay(200);
+  clackBuzzer();
   digitalWrite(LED_G, HIGH); 
-  delay(200);
+  delay(100);
+
   tft.print("--");
   digitalWrite(LED_B, LOW);  delay(200);
+  clackBuzzer();
   digitalWrite(LED_B, HIGH);
-  delay(200);
+  delay(100);
   tft.println(" OK");
 
   //SetupDigits();
@@ -1268,6 +1348,7 @@ void handleTouch(uint16_t x, uint16_t y) {
   if (y >= TAB_Y && y <= TAB_Y + TAB_H && !keyboardActive) {
     int newScreen = x / TAB_W;
     if (newScreen != currentScreen) {
+      
       currentScreen = newScreen;
       
       if (lastScreen == 4 && currentScreen != lastScreen)
@@ -1280,6 +1361,7 @@ void handleTouch(uint16_t x, uint16_t y) {
       
       digitalWrite(LED_G, LOW);
       delay(30);
+      clickBuzzer();
       digitalWrite(LED_G, HIGH);
       
       switch(currentScreen) {
@@ -1305,6 +1387,7 @@ void handleTouch(uint16_t x, uint16_t y) {
   if (currentScreen == 0) {
     vaultFrame = (vaultFrame + 1) % 16;
     drawVaultBoy(bitmapStartX, bitmapStartY, vaultFrame);
+    clickBuzzer();
   }
   else if (currentScreen == 2) {
       handleRadioSetButtons(x, y);
@@ -1383,8 +1466,8 @@ void drawVaultBoy(int16_t cx, int16_t cy, int8_t frame) {
   int widthtext = tft.textWidth(lvlInfo);
   int heighttext = tft.fontHeight();
 
-  tft.fillRect((TFT_WIDTH_SCREEN / 2) - (widthtext/2), TAB_Y - heighttext - heighttext / 2 , widthtext, heighttext, TFT_BLACK);
-  drawScanlinesButtons((TFT_WIDTH_SCREEN / 2) - (widthtext/2),TAB_Y - heighttext - heighttext / 2, heighttext + 2, widthtext + 5);
+  tft.fillRect((TFT_WIDTH_SCREEN / 2) - (widthtext/2), TAB_Y - heighttext - heighttext / 2 , widthtext + heighttext, heighttext, TFT_BLACK);
+  drawScanlinesButtons((TFT_WIDTH_SCREEN / 2) - (widthtext/2),TAB_Y - heighttext - heighttext / 2, heighttext + 2, widthtext + heighttext);
   tft.drawString(lvlInfo, TFT_WIDTH_SCREEN / 2, TAB_Y - heighttext);
   //if (DEBUGFLAG) Serial.printf("[GUI] heighttext = %d, start yrect = %d, ystring = %d, tabY = %d\n", heighttext , TAB_Y - heighttext*2, TAB_Y - heighttext, TAB_Y);
   updateLevel(frame + 1);
@@ -1394,6 +1477,7 @@ void drawVaultBoy(int16_t cx, int16_t cy, int8_t frame) {
 
 void drawPipBoyScreen() {
   if (DEBUGFLAG) Serial.println("[GUI] Open screen 0 - Main Screen");
+  clickBuzzer();
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
   updateHPAP();
@@ -1656,17 +1740,16 @@ void DrawDate(time_t utc) {
 
     tft.setTextSize(4);
     int h = tft.fontHeight();
-    tft.fillRect(0, 170 - h, TFT_WIDTH_SCREEN, h, TFT_BLACK);
-    drawScanlinesButtons(0, 170 - h, h, TFT_WIDTH_SCREEN);
-    tft.drawString(buffer, TFT_WIDTH_SCREEN / 2, 170);
+    tft.fillRect(0, SCREEN_BOTTOM_Y - h*2 - 10, TFT_WIDTH_SCREEN, h, TFT_BLACK);
+    drawScanlinesButtons(0, SCREEN_BOTTOM_Y - h*2 - 10, h, TFT_WIDTH_SCREEN);
+    tft.drawString(buffer, TFT_WIDTH_SCREEN / 2, SCREEN_BOTTOM_Y - h - 10);
 
     int dow = weekday(local);
     String dayNames[] = {"", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     tft.setTextSize(3);
-    tft.fillRect(0, 130 - h, TFT_WIDTH_SCREEN, h, TFT_BLACK);
-
-    drawScanlinesButtons(0, 130 - h, h, TFT_WIDTH_SCREEN);
-    tft.drawString(dayNames[dow], TFT_WIDTH_SCREEN / 2, 130);
+    tft.fillRect(0,SCREEN_BOTTOM_Y - (h * 3) - 20, TFT_WIDTH_SCREEN, h, TFT_BLACK);
+    drawScanlinesButtons(0, SCREEN_BOTTOM_Y - (h * 3) - 20, h, TFT_WIDTH_SCREEN);
+    tft.drawString(dayNames[dow], TFT_WIDTH_SCREEN / 2, SCREEN_BOTTOM_Y - (h * 2) - 20);
     prevDayCache = dd;
   }
 }
@@ -1674,6 +1757,7 @@ void DrawDate(time_t utc) {
 void drawPipBoyScreen1() {
 
   if (DEBUGFLAG) Serial.println("[GUI] Open screen 1 : CLOCK");
+  clickBuzzer();
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
   if (!clockInitialized) {
@@ -1722,6 +1806,7 @@ void drawPipBoyScreen1() {
 
 void drawPipBoyScreen2() {
   if (DEBUGFLAG) Serial.println("[GUI] Open screen 2 : RADIO");
+  clickBuzzer();
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
  tft.setTextColor(TFT_GREEN);
@@ -1778,6 +1863,7 @@ void drawPipBoyScreen2() {
 
 void drawPipBoyScreen3() {
   if (DEBUGFLAG) Serial.println("[GUI] Open screen 3 : WEATHER");
+  //clickBuzzer();
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
   
@@ -1799,6 +1885,7 @@ void drawPipBoyScreen3() {
 void drawPipBoyScreen4() {
 
   if (DEBUGFLAG) Serial.println("[GUI] Open screen 4 : GENERAL (Setup)");
+  clickBuzzer();
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
   drawButtonsScreen4();
@@ -1871,7 +1958,7 @@ void HandleButtonsScreen4(uint16_t xTouch, uint16_t yTouch) {
         tft.fillRect(x, y, tab_b_W, tab_b_H, TFT_GREEN);
         tft.setTextColor(TFT_BLACK);
       }
-    
+      clickBuzzer();
       switch(i) {
         case 1:
           tft.drawString("Wi-Fi", x + tab_b_W/2, y + tab_b_H/2);
@@ -2013,7 +2100,7 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     digitalWrite(LED_B, HIGH);
     editlat = true;
     showKeyboard(weatherLat.c_str());
-    
+    clickBuzzer();
    // weatherLat = String(getKeyboardInput());
     //drawWeatherSettings();
     return;
@@ -2024,6 +2111,7 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     delay(30);
     digitalWrite(LED_B, HIGH);
     editlon = true;
+    clickBuzzer();
     showKeyboard(weatherLon.c_str());
     //weatherLon = String(getKeyboardInput());
     //drawWeatherSettings();
@@ -2036,6 +2124,7 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     delay(30);
     digitalWrite(LED_B, HIGH);
     weatherCelsius = true;
+    clickBuzzer();
     drawWeatherSettings();
     return;
   }
@@ -2045,6 +2134,7 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     delay(30);
     digitalWrite(LED_B, HIGH);
     weatherCelsius = false;
+    clickBuzzer();
     drawWeatherSettings();
     return;
   }
@@ -2055,6 +2145,7 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     delay(30);
     digitalWrite(LED_G, HIGH);
     weatherSettingsActive = false;
+    clickBuzzer();
     SaveBackUpToEPPR(); 
     weatherForceUpdate();
     drawPipBoyScreen4();
@@ -2066,6 +2157,7 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     digitalWrite(LED_R, LOW);
     delay(30);
     digitalWrite(LED_R, HIGH);
+    clickBuzzer();
     weatherSettingsActive = false;
     drawPipBoyScreen4();
     return;
@@ -2199,7 +2291,7 @@ void HandleTimeSettings(uint16_t x, uint16_t y)
 {
 
   if (x < LIST_X || x > TFT_WIDTH_SCREEN - 5 || y < 10 || y > 10 + 186) return;
-
+  clickBuzzer();
   if (timeSettingsActive)
   {
      int fieldX = LIST_X + 10, fieldY = 35, fieldW = 100, fieldH = 20, feldPad = 5;
@@ -2277,7 +2369,7 @@ void drawRadioSettings() {
   tft.setTextDatum(TL_DATUM);
   tft.setTextSize(1);
   //tft.setCursor(LIST_X + 10, 45);
-  tft.drawString("Select mp3 radio:", (TFT_WIDTH_SCREEN -LIST_X) / 2, 40 );
+  tft.drawString("Select mp3 radio:",LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2, 40 );
 
   int btnW = 60, btnH = 25, btnY = 60;
   int startX = LIST_X + 12;
@@ -2318,7 +2410,7 @@ void drawRadioSettings() {
     tft.setTextColor(TFT_GREEN);
     if (!sdCardInitialized)
     {
-      tft.drawString("Insert SD card", LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2, 120);
+      tft.drawString("Insert SD card",LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2, 120);
     } else
     {
       tft.setCursor(LIST_X + 10, 110);
@@ -2356,6 +2448,7 @@ void handleRadioSettingsTouch(uint16_t x, uint16_t y) {
   if (y >= btnY && y <= btnY + btnH && x >= startX && x <= startX + btnW) {
     if (radioIsPlaying()) radioPause(); 
     digitalWrite(LED_B, LOW); delay(30); digitalWrite(LED_B, HIGH);
+    clickBuzzer();
     radioPlaySource = 0; drawRadioSettings(); return;
   }
   startX += btnW + 10;
@@ -2364,6 +2457,7 @@ void handleRadioSettingsTouch(uint16_t x, uint16_t y) {
   if (y >= btnY && y <= btnY + btnH && x >= startX && x <= startX + btnW) {
     if (radioIsPlaying()) radioPause(); 
     digitalWrite(LED_B, LOW); delay(30); digitalWrite(LED_B, HIGH);
+    clickBuzzer();
     radioPlaySource = 1; drawRadioSettings(); return;
   }
   startX += btnW + 10;
@@ -2372,12 +2466,14 @@ void handleRadioSettingsTouch(uint16_t x, uint16_t y) {
   if (y >= btnY && y <= btnY + btnH && x >= startX && x <= startX + btnW) {
     if (radioIsPlaying()) radioPause();
     digitalWrite(LED_B, LOW); delay(30); digitalWrite(LED_B, HIGH);
+    clickBuzzer();
     radioPlaySource = 2; drawRadioSettings(); return;
   }
 
   // Поле Folder (только SD)
   if (radioPlaySource == 0 && x >= LIST_X + 70 && x <= LIST_X + 220 && y >= 105 && y <= 125) {
     digitalWrite(LED_B, LOW); delay(30); digitalWrite(LED_B, HIGH);
+    clickBuzzer();
     showKeyboard(radioSDFolder.c_str());
     return;
   }
@@ -2390,6 +2486,7 @@ void handleRadioSettingsTouch(uint16_t x, uint16_t y) {
       SaveBackUpToEPPR();
       //loadSDPlaylist();   // вызов из radio_module
     }
+    clickBuzzer();
     drawPipBoyScreen4();
     return;
   }
@@ -2398,6 +2495,7 @@ void handleRadioSettingsTouch(uint16_t x, uint16_t y) {
   if (x >= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5 && x <= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 65 && y >= 150 && y <= 175) {
     digitalWrite(LED_R, LOW); delay(30); digitalWrite(LED_R, HIGH);
     radioSettingsActive = false;
+    clickBuzzer();
     drawPipBoyScreen4();
     return;
   }
@@ -2429,6 +2527,7 @@ void handleRadioSetButtons(uint16_t x, uint16_t y) {
       
       if (x >= xp * i + 5 && x <= xp * i + 5 + xp) 
       {
+        clickBuzzer();
         switch(i) {
         case 0: {
                   //tft.fillRect(20, 80, 300, 40, TFT_BLACK);
@@ -2638,6 +2737,16 @@ void updateLevel(int8_t frame)
 }
 
 void updateHPAP() {
+  bool psActive = false;
+
+  if (pulseSensFound)
+  {
+    if (pulseSensorUpdate())
+      psActive = true;
+  } 
+
+  if (!psActive)
+  {
     time_t current = now();
     time_t local = myTZ.toLocal(current, &tcr);
     int h = hour(local);
@@ -2681,7 +2790,7 @@ void updateHPAP() {
         currentAP = (minutes - 330) / 5;
         if (currentAP > apMax) currentAP = apMax;
     }
-
+  }
     //if (DEBUGFLAG) Serial.printf("HP %d/%d AP%d/%d, curr minutes:%d\n", currentHP, hpMax, currentAP, apMax, minutes);
 
     if (currentScreen == 0)
@@ -2692,15 +2801,20 @@ void updateHPAP() {
       tft.setTextSize(1);
       tft.setTextDatum(MC_DATUM);
       tft.setCursor(135, 10);
+      if (psActive)
+      tft.printf("BPM %d/%d\n", currentHP, hpMax);
+      else
       tft.printf("HP %d/%d\n", currentHP, hpMax);
       tft.setCursor(210, 10);
       tft.printf("AP %d/%d", currentAP, apMax);
-        if (currentHP == hpMax)
+      //if (currentHP == hpMax)
+      if (psActive)
         {
           tft.setCursor(280, 10);
-          tft.print("XP MAX");
+          tft.print("PULSE ACTIVE");
         }
     }
+  
 }
 
 
@@ -2851,7 +2965,7 @@ void updateWeatherScreen()
   
   // --- РЕЖИМ с BMP — две панели по половине экрана ---
   int panelW = TFT_WIDTH_SCREEN / 2;  // Половина ширины экрана
-  int panelH = SCREEN_CONTENT_H;
+  int panelH = SCREEN_CONTENT_H - 15;
   int leftX = 0;
   int rightX = panelW;                 // Вторая половина начинается здесь
   
@@ -2925,24 +3039,26 @@ void drawWeatherPanelCenter(int cx, int y, int w, int h)
   
   tft.setTextDatum(TC_DATUM);
   tft.setTextColor(TFT_GREEN);
-  tft.setTextSize(6);
-  int tw = tft.textWidth("+88 C");
+  int tempFSize = bmpFound ? 4 : 6;
+  tft.setTextSize(tempFSize);
+  int tw = tft.textWidth("+888 C");
   int th = tft.fontHeight();
   int sx = cx - tw / 2;
-      tft.fillRect(sx, y, tw, th, TFT_BLACK);
-      drawScanlinesButtons(sx, y, th, tw);
-  tft.drawString(tempDisplay, cx, y);   // cx = TFT_WIDTH_SCREEN / 2
+      tft.fillRect(sx, y + 10 , tw, th, TFT_BLACK);
+      drawScanlinesButtons(sx, y + 10, th, tw);
+  tft.drawString(tempDisplay, cx, y + 10);   // cx = TFT_WIDTH_SCREEN / 2
   
   int Widthstr = tft.textWidth(tempDisplay);
-  int circleX = cx + Widthstr / 2 - 50;     // Смещение от центра
-  int circleY = y + 5;
+  int WidthChar = tft.textWidth("C");
+  int circleX = cx + Widthstr / 2 - WidthChar - (WidthChar/2);     // Смещение от центра
+  int circleY = y + 15;
   for (int r = 6; r >= 4; r--) {
     tft.drawCircle(circleX, circleY, r, TFT_GREEN);
   }
      
   // --- Иконка погоды ---
   //tft.drawString(tempDisplay, cx, tempY);
-  drawWeatherIconCentered(cx, y + 70, weatherPtr->condition, TFT_GREEN);
+  drawWeatherIconCentered(cx, y + 80, weatherPtr->condition, TFT_GREEN);
 
   tft.setTextSize(1);
   tft.setTextDatum(TL_DATUM);
@@ -2955,13 +3071,13 @@ void drawWeatherPanelCenter(int cx, int y, int w, int h)
   // --- Координаты --- 
   String crdStr = "Coords: " + String(weatherLat.substring(0, 7)) + ", " + String(weatherLon.substring(0, 7));
   tw = tft.textWidth(crdStr);
-  int coordX = (TFT_WIDTH_SCREEN - tw) / 2;
+  int coordX = cx - tw/ 2;
   int coordY = windY + 20;
       tft.fillRect(coordX, windY - 7, tw, 35, TFT_BLACK);
       drawScanlinesButtons(coordX, windY - 7, 35, tw);
 
   tft.drawString("Wind:      " + String(weatherPtr->wind.c_str()) + " km/h",windX, windY);
-  drawWindArrow(windX + 30, windY + 3, weatherPtr->windDir, 20, TFT_WHITE);
+  drawWindArrow(windX + 35, windY + 3, weatherPtr->windDir, 20, TFT_WHITE);
   tft.drawString(crdStr,coordX, coordY);
  
   //tft.setCursor(cx - halfW / 2 + 20, coordY);
@@ -2983,95 +3099,11 @@ void drawWeatherPanelCenter(int cx, int y, int w, int h)
 void drawWeatherPanelSide(int x, int y, int w, int h)
 {
   int cx = x + w / 2;     // Центр правой панели = TFT_WIDTH_SCREEN * 3/4
-  int halfW = w / 2;      // Половина ширины панели
+  //int halfW = w / 2;      // Половина ширины панели
   
-  if (WiFi.status() != WL_CONNECTED) {
-    weatherLoadFromEEPROM();
-  }
-  
-  if (!weatherHasData()) {
-    int boxW = w - 10;
-    int boxH = 80;
-    int boxX = x + 5;
-    int boxY = y + h / 2 - boxH / 2;
-    
-    tft.fillRect(boxX, boxY, boxW, boxH, TFT_BLACK);
-    tft.drawRect(boxX, boxY, boxW, boxH, TFT_GREEN);
-    
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_RED);
-    tft.setTextSize(1);
-    tft.drawString("No weather data", cx, boxY + boxH / 2 - 10);
-    
-    if (WiFi.status() != WL_CONNECTED) {
-      tft.drawString("Connect WiFi", cx, boxY + boxH / 2 + 10);
-    } else {
-      tft.setTextColor(TFT_GREEN);
-      tft.drawString("Loading...", cx, boxY + boxH / 2 + 10);
-      needUpdateScreenWeather = true;
-    }
-    return;
-  }
-  
-  needUpdateScreenWeather = false;
-  CurrentWeather* weatherPtr = weatherGetCurrent();
-  
-  // --- Температура (size 3, компактно) ---
-  int tempVal = weatherPtr->temperature.toInt();
-  String unit = weatherCelsius ? "C" : "F";
-  unit = " " + unit;
-  String tempDisplay;
-  
-  if (tempVal > 0) {
-    tempDisplay = "+" + weatherPtr->temperature + unit;
-  } else if (tempVal < 0) {
-    tempDisplay = "-" + weatherPtr->temperature + unit;
-  } else {
-    tempDisplay = "0" + unit;
-  }
-  
-  tft.setTextDatum(TC_DATUM);
-  tft.setTextColor(TFT_GREEN);
-  tft.setTextSize(3);
-  int tempY = y + 30;
-  tft.drawString(tempDisplay, cx, tempY);
-  
-  int Widthstr = tft.textWidth(tempDisplay);
-  int circleX = cx + Widthstr / 2 - 25;
-  int circleY = tempY + 3;
-  for (int r = 4; r >= 2; r--) {
-    tft.drawCircle(circleX, circleY, r, TFT_GREEN);
-  }
-  
-  // --- Иконка погоды ---
-  drawWeatherIconCentered(cx, y + 65, weatherPtr->condition, TFT_GREEN);
-  
-  // --- Ветер — относительно левого края панели ---
-  int windY = y + 100;
-  tft.setTextSize(1);
-  tft.setTextDatum(TL_DATUM);
-  tft.setCursor(x + 5, windY);          // Отступ от левого края панели
-  tft.print("Wind: ");
-  drawWindArrow(x + halfW, windY + 3, weatherPtr->windDir, 15, TFT_WHITE);
-  tft.setCursor(x + halfW + 20, windY);
-  tft.printf("%s km/h", weatherPtr->wind.c_str());
-  
-  // --- Координаты ---
-  int coordY = windY + 25;
-  tft.setCursor(x + 5, coordY);
-  tft.print("Coords: ");
-  tft.print(weatherLat.substring(0, 6));
-  tft.print(", ");
-  tft.print(weatherLon.substring(0, 6));
-  
-  // --- Проверка устаревания ---
-  if (!weatherHasData() || (WiFi.status() != WL_CONNECTED)) {
-    int mins = weatherGetAgeMinutes();
-    if (mins > 30) {
-      weatherForceUpdate();
-      weatherUpdate();
-    }
-  }
+
+  drawWeatherPanelCenter(cx, y, w, h);
+ 
 }
 
 void drawBMPPanel(int x, int y, int w, int h)
@@ -3087,24 +3119,36 @@ void drawBMPPanel(int x, int y, int w, int h)
   
   // Температура крупно
   float temp = bmpGetTemperatureC();
-  String tempStr = String(temp, 1);
-  if (temp > 0) tempStr = "+" + tempStr;
-  
-  tft.setTextDatum(TC_DATUM);
+  String tempStr = String(temp, 0);
+  if (temp > 0) tempStr = "+" + tempStr; else if (temp < 0) tempStr = "-" + tempStr;
+  String unit = weatherCelsius ? "C" : "F";
+  tempStr = tempStr + " " + unit;
+
+    tft.setTextDatum(TC_DATUM);
   tft.setTextColor(TFT_GREEN);
-  tft.setTextSize(4);
-  tft.drawString(tempStr, cx, y + 45);
-  
-  int tw = tft.textWidth(tempStr);
-  tft.drawCircle(cx + tw / 2 + 8, y + 48, 5, TFT_GREEN);
-  
+  int tempFSize = bmpFound ? 4 : 6;
+  tft.setTextSize(tempFSize);
+  int tw = tft.textWidth("+888 C");
+  int th = tft.fontHeight();
+  int sx = cx - tw / 2;
+      tft.fillRect(sx, y+10, tw, th, TFT_BLACK);
+      drawScanlinesButtons(sx, y+10, th, tw);
+  tft.drawString(tempStr, cx, y + 10); 
+
+  int Widthstr = tft.textWidth(tempStr);
+  int WidthChar = tft.textWidth("C");
+  int circleX = cx + (Widthstr / 2) - WidthChar - (WidthChar/2);     // Смещение от центра
+  int circleY = y + 15;
+  for (int r = 6; r >= 4; r--) {
+    tft.drawCircle(circleX, circleY, r, TFT_GREEN);
+  }
   // "INDOOR"
   tft.setTextSize(1);
   tft.setTextColor(tft.color565(0, 150, 0));
-  tft.drawString("INDOOR", cx, y + 75);
+  tft.drawString("INDOOR", cx, y + 10 + th);
   
   // Разделитель
-  int lineY = y + 90;
+  int lineY = y + th + 20;
   tft.drawLine(x + pad, lineY, x + w - pad, lineY, tft.color565(0, 80, 0));
   
   // Данные мелким шрифтом
@@ -3116,7 +3160,15 @@ void drawBMPPanel(int x, int y, int w, int h)
   int rowH = 16;
   int labelX = x + pad + 2;         // От левого края панели
   int valueX = x + halfW + 5;      // Правая половина панели
-  
+
+  if (activeSensor == SENSOR_BME280) {
+        tft.setCursor(labelX, rowY);
+        tft.print("Humidity:");
+        tft.setCursor(valueX, rowY);
+        tft.printf("%.1f %%", bmpGetHumidity());
+        rowY += rowH;
+    }
+
   tft.setCursor(labelX, rowY);
   tft.print("Pressure:");
   tft.setCursor(valueX, rowY);
@@ -3139,6 +3191,8 @@ void drawBMPPanel(int x, int y, int w, int h)
   tft.print("Sea level:");
   tft.setCursor(valueX, rowY);
   tft.printf("%.1f m", bmpGetSeaLevelAltitude());
+
+
 }
 
 
@@ -3154,13 +3208,13 @@ void drawUpdateInfo()
   
   int tw = tft.textWidth("Updated: 88.88.8888 88:88 (WIFI OFF)");
   int th = tft.fontHeight();
-  int cx = (TFT_WIDTH_SCREEN - tw) / 2;
+  int cx = (TFT_WIDTH_SCREEN) / 2 - tw;
   int cy = SCREEN_BOTTOM_Y - 10;
       tft.fillRect(cx, cy, tw, th, TFT_BLACK);
       drawScanlinesButtons(cx, cy, th, tw);
       
   //String WeUpStr = "Updated: " + 
-  tft.setCursor(cx, cy);
+  tft.setCursor(cx + (tw / 2), cy);
   tft.print("Updated: ");
  // updateWeatherTimeDisplay();  // Твоя существующая функция
 //}
@@ -3193,47 +3247,54 @@ void drawUpdateInfo()
   }
   
   // Координаты поля времени
-  int timeX = cx + 54;//(TFT_WIDTH_SCREEN/2) - 100 + 54;  // После "Updated: "
-  int timeY = cy; //190;
+  int timeXW = cx + 54;//(TFT_WIDTH_SCREEN/2) - 100 + 54;  // После "Updated: "
+  int timeYW = cy; //190;
   //int timeW = 100;
   //int timeH = 12;
   
   tft.setTextColor(isOld ? TFT_ORANGE : TFT_GREEN);
-  tft.setCursor(timeX, timeY);
+  //tft.setCursor(timeXW, timeYW);
   
 
   if (WiFi.status() == WL_CONNECTED) {
     if (!isOld)
     {
-      tft.print(mins);
-      tft.print(" min ago");
+
+      stringw = stringw + String(mins) + " min ago";
+      //tft.print(mins);
+      //tft.print(" min ago");
     }
-    else
-      tft.print(stringw);
+    //else
+      //tft.print(stringw);
+
   } else {
     if (!isOld)
     {
-      tft.print(mins);
-      tft.print(" min ago");
-      tft.print(" (WiFi OFF)");
+      stringw = stringw + String(mins) + " min ago" + " (WiFi OFF)";
+      //tft.print(mins);
+      //tft.print(" min ago");
+      //tft.print(" (WiFi OFF)");
     }
     else
     {
-      tft.print(stringw);
-      tft.print(" (WiFi OFF)");
+      //tft.print(stringw);
+      //tft.print(" (WiFi OFF)");
+      stringw = stringw + " (WiFi OFF)";
     }
   }
-  
+  tft.drawString(stringw, (TFT_WIDTH_SCREEN) / 2, cy);
+
   // Индикатор источника
   tft.setTextSize(1);
   tft.setTextDatum(TR_DATUM);
   tft.setTextColor(tft.color565(0, 100, 0));
   // Закрасить старое значение
-  tft.fillRect(TFT_WIDTH_SCREEN - 20, 20, 40, 20, TFT_BLACK); 
-  drawScanlinesButtons(TFT_WIDTH_SCREEN - 20, 20, 24, 40);
   String src = (w->source == WEATHER_PRIMARY) ? "[W]" : 
                (w->source == WEATHER_OPENMETEO) ? "[O]" : "[E]";
-  tft.drawString(src, TFT_WIDTH_SCREEN - 20, 35);
+  int tws = tft.textWidth(src);             
+  tft.fillRect(TFT_WIDTH_SCREEN - tws - 5, 10, 20, 20, TFT_BLACK); 
+  drawScanlinesButtons(TFT_WIDTH_SCREEN - tws - 5, 10, 24, 20);
+  tft.drawString(src, TFT_WIDTH_SCREEN - 5, 15);
   // Предупреждение о старых данных
   //if (isOld) {
   //  tft.setTextColor(TFT_RED);
@@ -3243,4 +3304,238 @@ void drawUpdateInfo()
   
 }
 
+bool pulseSensorUpdate()
+{
+  //digitalWrite(PULSE_SENSOR_VCC, HIGH);
+  //delay(100);
+  
+  int raw = pulse.getRaw();
+  int bpm = pulse.getBPM();
+
+if (DEBUGFLAG && pulseSensFound) 
+    {
+      tft.setTextSize(1);
+      tft.setTextDatum(TR_DATUM);
+      tft.setTextColor(TFT_GREEN);
+      // Закрасить старое значение
+      String src = "BPM: 300  RAW: 0000";
+      int tws = tft.textWidth(src);             
+      tft.fillRect(5, SCREEN_BOTTOM_Y - 20, tws, 20, TFT_BLACK);
+      src = "BPM: " + String(bpm) + "  RAW: " + String(raw);
+      tft.drawString(src, 5 + tws, SCREEN_BOTTOM_Y - 12);
+    }
+
+if (!pulse.onFinger())
+{
+ /// if (DEBUGFLAG) Serial.println("[PULSE] Not on hand");
+ // if (DEBUGFLAG) Serial.print("   Raw: "); Serial.println(raw);
+    
+ return false;
+}
+   // if (pulse.isChanged())
+   //   clackBuzzer();
+
+    
+  if (bpm > 0)
+  {  
+   // if (DEBUGFLAG) Serial.print("[PULSE] BPM: "); Serial.print(bpm);
+    //if (DEBUGFLAG) Serial.print(" Raw: ");
+    // Serial.println(" ");
+    currentHP = bpm;
+    currentAP = raw / 20;
+    
+    //if (pulse.checkBeep())
+     // clickBuzzer();
+    return true;
+
+  } else {
+
+    currentAP = raw / 20;
+    //if (DEBUGFLAG) Serial.println("[PULSE] NO PULSE");
+    return false; 
+  }
+
+}
+
+void clickBuzzer()
+{
+  tone(BUZZER_PIN, 220 , 10);
+  //delay(25);
+  noTone(BUZZER_PIN);
+}
+
+void clickBuzzerKey()
+{
+
+ int dtmfk[] = {1187, 697, 4770, 941, 770, 1997, 1141, 741};
+ //for (int i = 0; i < (sizeof(dtmf) / sizeof(dtmf[0])); i ++)
+
+  //int dtflag = random(0, 1);
+  int rdeldtk = random(10, 60);
+  int idxdtk = random(0, (sizeof(dtmfk) / sizeof(dtmfk[0])));
+  tone(BUZZER_PIN, dtmfk[idxdtk] , rdeldtk);
+  //tone(BUZZER_PIN, 220 , 10);
+  //delay(25);
+  noTone(BUZZER_PIN);
+}
+
+void clackBuzzer()
+{
+  
+ int dtmf[] = {1187, 697, 4770, 941, 770, 1997, 1141, 741};
+ //for (int i = 0; i < (sizeof(dtmf) / sizeof(dtmf[0])); i ++)
+
+int dtflag = random(0, 1);
+int rdeldt = random(10, 60);
+int idxdt = random(0, (sizeof(dtmf) / sizeof(dtmf[0])));
+
+tone(BUZZER_PIN, 8220 , 10);
+delay(50);
+ for (int i = 0; i < 8; i++)
+  {
+    idxdt = random(0, (sizeof(dtmf) / sizeof(dtmf[0])));
+    rdeldt = random(10, 60);
+    dtflag = random(0, 3);
+    if (dtflag)
+    tone(BUZZER_PIN, dtmf[idxdt] , rdeldt);
+    delay(rdeldt + random(1, 10));
+    //dtflag = random(0, 1);
+    //if (dtflag)
+     
+  }
+  tone(BUZZER_PIN, 120 , 10);
+     delay(20);
+  noTone(BUZZER_PIN);
+}
+
+
+
+
+// Вспомогательная функция — плавное сканирование частоты
+
+void sweepTone(int startFreq, int endFreq, int durationMs, int stepMs = 10) {
+  int steps = durationMs / stepMs;
+  float delta = (float)(endFreq - startFreq) / steps;
+  ledcWrite(BUZZER_PIN, 128);
+  for (int i = 0; i <= steps; i++) {
+    int f = startFreq + (int)(delta * i);
+    tone(BUZZER_PIN, f, stepMs);
+    delay(stepMs);
+  }
+  noTone(BUZZER_PIN);
+}
+
+void startBuzzer()
+{
+  sweepTone(800, 15000, 400, 8);
+  //delay(100);
+}
+
+
+// === ЗВУК ЗАГРУЗКИ PIP-BOY ===
+void pipboyBootSound() {
+  // 1. POWER ON — щелчок реле (короткий низкий «тик»)
+  tone(BUZZER_PIN, 150, 20);
+  delay(30);
+  noTone(BUZZER_PIN);
+  delay(80);
+
+  // 2. CRT WARM-UP — нарастающий писк вакуумной трубки
+  // Имитирует разогрев катода: 800 Гц → 15 кГц, 600 мс
+  sweepTone(800, 15000, 600, 8);
+  delay(100);
+
+  // 3. TUBE HUM — низкочастотный гул ЭЛТ
+  // Пьезо плохо играет <200 Гц, поэтому имитируем «треск» гула серией импульсов
+  for (int i = 0; i < 15; i++) {
+    tone(BUZZER_PIN, 80 + random(0, 40), 12);
+    delay(20);
+  }
+  noTone(BUZZER_PIN);
+  delay(150);
+
+  // 4. DATA READ — быстрые электронные щелчки чтения памяти
+  // Как у старого дисковода, но короче
+  for (int burst = 0; burst < 4; burst++) {
+    for (int i = 0; i < 6; i++) {
+      int f = random(2000, 6000);
+      tone(BUZZER_PIN, f, random(15, 40));
+      delay(random(30, 70));
+    }
+    delay(random(80, 150)); // пауза между пакетами данных
+  }
+
+  // 5. SCREEN BLOOM — «расплывание» изображения
+  // Плавное падение высокой частоты + треск
+  sweepTone(12000, 3000, 400, 12);
+  for (int i = 0; i < 8; i++) {
+    tone(BUZZER_PIN, random(1000, 4000), 15);
+    delay(25);
+  }
+  delay(200);
+
+  // 6. BOOT COMPLETE — два коротких ретро-бипа (как в Fallout UI)
+  tone(BUZZER_PIN, 1800, 80);
+  delay(120);
+  tone(BUZZER_PIN, 2200, 120); // чуть выше и длиннее — «готово»
+  delay(150);
+  noTone(BUZZER_PIN);
+}
+
+
+// Неблокирующий радиационный треск (счётчик Гейгера)
+// level: 0=выкл, 1=фоновая радиация, 10=критическая масса
+void geigerTick(int level) {
+  static unsigned long lastTick = 0;
+  static unsigned long toneEnd = 0;
+  static unsigned long pauseMs = 0;
+  static bool sounding = false;
+
+  // Полное отключение
+  if (level <= 0) {
+    if (sounding) {
+      noTone(BUZZER_PIN);
+      sounding = false;
+    }
+    lastTick = millis();
+    pauseMs = 0;
+    return;
+  }
+
+  if (level > 15) level = 15;
+
+  // Фаза воспроизведения щелчка
+  if (sounding) {
+    if (millis() >= toneEnd) {
+
+      //digitalWrite(BUZZER_PIN, LOW);
+      noTone(BUZZER_PIN);
+      sounding = false;
+      // Случайная пауза до следующего щелчка (уровень сокращает интервал)
+      int minPause = map(level, 1, 14, 1200, 30);
+      int maxPause = map(level, 1, 14, 5000, 60);
+      pauseMs = random(minPause, maxPause + 1);
+      lastTick = millis();
+    }
+    return;
+  }
+
+  // Инициализация при первом запуске
+  if (pauseMs == 0) {
+    pauseMs = random(800, 2000);
+  }
+
+  // Проверяем, не подошло ли время щёлкнуть
+  if (millis() - lastTick >= pauseMs) {
+    int freq = random(50, 65);      // случайная высота щелчка
+    int duration = random(6, 10);       // случайная длительность
+    ledcWrite(BUZZER_PIN, 128);
+    tone(BUZZER_PIN, freq);
+    noTone(BUZZER_PIN);
+    //pinmode
+    //digitalWrite(BUZZER_PIN, HIGH);
+    toneEnd = millis() + duration;
+    sounding = true;
+  }
+}
 

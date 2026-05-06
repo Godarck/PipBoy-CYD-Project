@@ -2,28 +2,42 @@
 #define BMP280_MODULE_H
 
 #include <Adafruit_BMP280.h>
+#include <Adafruit_BME280.h>
+#include <Wire.h>
 
-// Глобальный объект датчика
+// Тип датчика
+enum SensorType {
+    SENSOR_NONE = 0,
+    SENSOR_BMP280,
+    SENSOR_BME280
+};
+
+// Глобальные объекты (только один будет инициализирован)
 extern Adafruit_BMP280 bmp;
+extern Adafruit_BME280 bme;
 
-// Инициализация (возвращает true если найден)
+// Текущий активный датчик
+extern SensorType activeSensor;
+
+// Инициализация с автоопределением
 bool bmpInit();
 
-// Измерение (forced mode — запуск и ожидание)
+// Измерение (универсальное для обоих датчиков)
 bool bmpMeasure();
 
-// Геттеры последнего измерения
+// Геттеры
 float bmpGetPressureHpa();
 float bmpGetPressureKpa();
 float bmpGetPressureMmHg();
 float bmpGetTemperatureC();
 float bmpGetTemperatureF();
+float bmpGetHumidity();           // Только для BME280, для BMP280 вернёт 0
 
-// --- Высота ---
-void bmpCalibrateAltitude();      // Запомнить текущее как "ноль"
+// Высота
+void bmpCalibrateAltitude();
 bool bmpIsCalibrated();
-float bmpGetRelativeAltitude();   // От калиброванной точки
-float bmpGetSeaLevelAltitude();   // От уровня моря
-void bmpSetSeaLevelPressure(float hpa); // Установить P моря (метео)
+float bmpGetRelativeAltitude();
+float bmpGetSeaLevelAltitude();
+void bmpSetSeaLevelPressure(float hpa);
 
 #endif

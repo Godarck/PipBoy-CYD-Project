@@ -59,6 +59,9 @@
 // ======================= BMP280 барометр =======================
 #define BMP280_ADDRESS 0x76
 
+// ======================= Pulse Sensor 3 pin Analog ======================= 
+#define PULSE_SENSOR_PIN    35 
+//#define PULSE_SENSOR_VCC 8
 
 // ======================= WiFi / NTP =======================
 #define NTP_SERVER "pool.ntp.org"
@@ -81,7 +84,7 @@
 #define RADIO_DAC_PIN 26        // GPIO26 - DAC_CHANNEL_2
 #define RADIO_VOLUME_DEFAULT 50 // 0-100 (громкость усилителя 8002D)
 
-
+#define BUZZER_PIN 32
 // =============== Weather ================
 //Координаты GPS по умолчанию для погоды (Москва)
 #define DEFAULT_LAT "55.7558"

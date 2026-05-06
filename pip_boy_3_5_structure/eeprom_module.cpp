@@ -5,7 +5,10 @@
 
 void eepromInit() {
   Wire.beginTransmission(EEPROM_ADDRESS);
-  if (Wire.endTransmission() == 0) {
+      int wrtrs = Wire.endTransmission();
+
+    Serial.printf("[WIRE] EEPROM wire = %d\n", wrtrs);
+  if (wrtrs == 0) {
     eepromFound = true;
     if (DEBUGFLAG) Serial.println("[EEPROM] AT24C32     OK");
   } else {
