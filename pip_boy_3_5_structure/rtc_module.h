@@ -30,5 +30,5 @@ extern time_t lastNtpSync;
 extern bool gpsTimeSynced;
 extern bool needUpdateTimeScreen;
 extern int currentScreen;
-extern lastScreen
+extern int lastScreen;
 #endif
