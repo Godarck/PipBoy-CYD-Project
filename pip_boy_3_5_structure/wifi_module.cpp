@@ -118,13 +118,13 @@ void drawWiFiScreen() {
   
   // Кнопка DISCONNECT/CONNECT
   if (wifiConnected) {
-    tft.fillRect(LIST_X + LIST_W - 55, LIST_Y - 35, 60, 25, TFT_BLACK);
-    tft.drawRect(LIST_X + LIST_W - 55, LIST_Y - 35, 60, 25, TFT_GREEN);
-    tft.drawString("DISCONECT", (LIST_X + LIST_W - 55) + 30, (LIST_Y - 35) + 12);
+    tft.fillRect(LIST_X + LIST_W - 70, LIST_Y - 35, 70, 25, TFT_BLACK);
+    tft.drawRect(LIST_X + LIST_W - 70, LIST_Y - 35, 70, 25, TFT_GREEN);
+    tft.drawString("DISCONECT", (LIST_X + LIST_W - 70) + 35, (LIST_Y - 35) + 12);
   } else {
-    tft.fillRect(LIST_X + LIST_W - 55, LIST_Y - 35, 60, 25, TFT_BLACK);
-    tft.drawRect(LIST_X + LIST_W - 55, LIST_Y - 35, 60, 25, TFT_GREEN);
-    tft.drawString("CONNECT", (LIST_X + LIST_W - 55) + 30, (LIST_Y - 35) + 12);
+    tft.fillRect(LIST_X + LIST_W - 70, LIST_Y - 35, 70, 25, TFT_BLACK);
+    tft.drawRect(LIST_X + LIST_W - 70, LIST_Y - 35, 70, 25, TFT_GREEN);
+    tft.drawString("CONNECT", (LIST_X + LIST_W - 70) + 35, (LIST_Y - 35) + 12);
   }
   
   // Список сетей
@@ -212,7 +212,7 @@ void handleWiFiTouch(uint16_t x, uint16_t y) {
   }
   
   // Кнопка DISCONNECT
-  if (wifiConnected && x >= LIST_X + LIST_W - 55 && x <= LIST_X + LIST_W && 
+  if (wifiConnected && x >= LIST_X + LIST_W - 70 && x <= LIST_X + LIST_W && 
       y >= LIST_Y - 35 && y <= LIST_Y - 10) {
     digitalWrite(LED_B, LOW);
     delay(30);
@@ -223,7 +223,7 @@ void handleWiFiTouch(uint16_t x, uint16_t y) {
   }
 
   // Кнопка CONNECT
-  if (!wifiConnected && x >= LIST_X + LIST_W - 55 && x <= LIST_X + LIST_W && 
+  if (!wifiConnected && x >= LIST_X + LIST_W - 70 && x <= LIST_X + LIST_W && 
       y >= LIST_Y - 35 && y <= LIST_Y - 10) {
     digitalWrite(LED_B, LOW);
     delay(30);

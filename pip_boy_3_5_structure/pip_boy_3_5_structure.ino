@@ -118,6 +118,7 @@ AP - зависит от времени суток (с 8 утра до 13:00 у�
 #include "radio.h"
 #include "BMP280Module.h"
 #include "pulse_sensor.h"
+#include "GPSModule.h"
 
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -179,8 +180,9 @@ struct BackUpTimers {
 // uint16_t calData[5] = { 178, 3762, 323, 3401, 1 };
 
 // (rotation 3)
-uint16_t calData[5] = { 177, 3713, 340, 3295, 7 };
-
+//uint16_t calData[5] = { 177, 3713, 340, 3295, 7 };
+//uint16_t calData[5] = { 189, 3748, 307, 3395, 7 };
+uint16_t calData[5] = { 160, 3766, 282, 3404, 7 };
 // Настройки отображения часов
 const bool SHOW_24HOUR = true;
 const bool SHOW_AMPM = false;
@@ -212,6 +214,11 @@ bool bmpFound = false;
 
 // PULSE SENSOR
 bool pulseSensFound = false;
+bool psActive = false;
+
+// GPS
+GPSModule gps(Serial2, /*rx=*/ GPS_ONRX_PIN, /*tx=*/GPS_ONTX_PIN, /*baud=*/9600);
+bool GPS_Connected = false;
 
  //SPIClass SDSPI(VSPI);
 
@@ -282,9 +289,11 @@ void drawPipBoyScreen4();
 void drawButtonsScreen4();
 void drawRadioSetButtons();
 void updateHPAP();
+void UpdateLeftPanel();
 void UpdateRightPanel();
 bool parseTime(const char* input);
 void sanitizeTimeInput(char* input);
+void sanitizeGPSInput( char* input);
 bool isValidString(const String& str);
 String pad2(uint8_t val);
 
@@ -469,7 +478,10 @@ void setup() {
 
   }
   
-  
+   gps.begin();
+    if (DEBUGFLAG) Serial.println("[GPS] UART инициализирован");
+    
+    
   // TFT
 
   
@@ -551,6 +563,10 @@ void loop() {
   //radioLoop();
   //radioLoop();
   geigerTick(vaultFrame);
+  if (GPS_Connected == true)
+  {
+    gps.update();
+  }
   static unsigned long lastBpmUpdate = 0;
   
   static unsigned long lastHPAPUpdate = 0;
@@ -568,6 +584,36 @@ void loop() {
   if (millis() - lastHPAPUpdate > 1000) {
             lastHPAPUpdate = millis();
             updateHPAP();
+
+    if (GPS_Connected == true)
+    {
+        String srcg = "[GPS] Satt: 000 On: 0";
+        if (gps.hasFix()) {
+                srcg = "[GPS] Active D: " + String(gps.getTimeString()) ;
+        } else if (gps.hasTime()) {
+                srcg = "[GPS] Time: " + String(gps.getTimeString()) ;
+        }
+        // Вариант 3: Полная тишина
+        else {
+            srcg = "[GPS] No data from GPS";
+        }
+
+        if (DEBUGFLAG && GPS_Connected) 
+        {
+          tft.setTextSize(1);
+          tft.setTextDatum(TR_DATUM);
+          tft.setTextColor(TFT_GREEN);
+          // Закрасить старое значение
+          String src = "[GPS] Active D: 00.00.00";
+          int tws = tft.textWidth(src); 
+          src = "[GPS] Satt: " + String(gps.getSats()) + " On: " + String(gps.hasFix());
+          tft.fillRect(5, SCREEN_BOTTOM_Y - 30 - TAB_H, tws, 22, TFT_NAVY);
+          tft.setCursor(5, SCREEN_BOTTOM_Y - 30 - TAB_H);
+          tft.println(srcg);
+          tft.setCursor(5, SCREEN_BOTTOM_Y - 15 - TAB_H);
+          tft.println(src);
+        }
+    }
   }
 
   // Обновление времени погоды каждую минуту
@@ -604,64 +650,8 @@ void loop() {
     if (currentScreen == 0)
     {
         updateHPAP();
+        UpdateLeftPanel();
         UpdateRightPanel();
-        tft.setTextSize(1);
-        tft.setTextDatum(TC_DATUM);
-        tft.setTextColor(TFT_GREEN);
-      if (WiFi.status() == WL_CONNECTED) 
-      {
-        tft.drawRect(9, 35, 29, 15, TFT_GREEN);
-        tft.setCursor(12, 38);
-        //tft.fillRect(9, 35, 29, 15, TFT_GREEN);
-        tft.print("WiFi");
-      }else
-      {
-        tft.fillRect(9, 35, 29, 15, TFT_BLACK);
-        drawScanlinesButtons(9, 35, 18, 29);
-        tft.setCursor(12, 38);
-        tft.print("WiFi");
-      }
-
-      if (radioIsPlaying()) 
-      {
-        tft.drawRect(9, 55, 29, 15, TFT_GREEN);
-        tft.setCursor(12, 58);
-        tft.print("RAD");
-        //tft.fillRect(9, 35, 29, 15, TFT_GREEN);
-      }else
-      {
-        tft.fillRect(9, 55, 29, 15, TFT_BLACK);
-        drawScanlinesButtons(9, 55, 18, 29);
-        tft.setCursor(12, 58);
-        tft.print("RAD");
-      }
-      tft.setCursor(12, 78);
-
-      tft.fillRect(9, 75, 35, 15, TFT_BLACK);
-      drawScanlinesButtons(9, 75, 18, 35);
-      CurrentWeather* w = weatherGetCurrent();
-      String src = (w->source == WEATHER_PRIMARY) ? "[W]" : 
-               (w->source == WEATHER_OPENMETEO) ? "[O]" : "[E]";
-      //tft.drawString(src, 310, 35);
-      if ((src == "[W]") || (src == "[O]"))
-      {
-        src = "W " + src;
-        tft.drawRect(9, 75, 35, 15, TFT_GREEN);
-        tft.print(src);
-      }
-      else
-      {
-        if (eepromFound)
-          tft.print("W [E]");
-        else
-        {
-           if (!weatherHasData()) 
-            tft.print("ERR W");
-          else
-            tft.print("ERR E");
-        }
-          
-      }
     }
 
     if (currentScreen == 2)
@@ -670,8 +660,31 @@ void loop() {
         if (DEBUGFLAG) Serial.println("Radio screen working..");
         UpdateMetaData();
     }
-      
+
+
+  if (GPS_Connected && DEBUGFLAG)
+  {
+
+    if (gps.hasFix()) {
+        Serial.printf("[GPS] Sats: %d | Lat: %.6f | Lng: %.6f | Alt: %.1f m | Speed: %.1f km/h | Time: %s\n",
+            gps.getSats(),
+            gps.getLat(),
+            gps.getLng(),
+            gps.getAlt(),
+            gps.getSpeedKmph(),
+            gps.getTimeString().c_str());
+    } else if (gps.hasTime()) {
+            Serial.printf("[GPS] - TIME ONLY - Sats: %d (Searching...) | %s UTC | Wait Coords...\n",
+            gps.getSats(),
+            gps.getTimeString().c_str());
+    }
+    // Вариант 3: Полная тишина
+    else {
+        Serial.println("[GPS] ERROR - NO DATA ");
+    }
   }
+  }
+      
   
   // Автообновление погоды каждые 15 минут
   static unsigned long lastWeatherCheck = 0;
@@ -727,9 +740,9 @@ void loop() {
       int textW = tft.textWidth(inputBuffer);
       pcursor = !pcursor;
       if (pcursor)
-        tft.drawFastVLine(KEYBOARD_X + 63 + textW, KEYBOARD_Y + 32, 14, TFT_GREEN);
+        tft.drawFastVLine(KEYBOARD_X + KEY_W * 2 + KEY_GAP*2 + 5 + 6 + textW, KEYBOARD_Y + 32, 14, TFT_GREEN);
       else
-        tft.drawFastVLine(KEYBOARD_X + 63 + textW, KEYBOARD_Y + 32, 14, TFT_BLACK);
+        tft.drawFastVLine(KEYBOARD_X + KEY_W * 2 + KEY_GAP*2 + 5 + 6 + textW, KEYBOARD_Y + 32, 14, TFT_BLACK);
     }
   }
   
@@ -738,24 +751,49 @@ void loop() {
     if (wifiWaitingForPassword) {
       wifiWaitingForPassword = false;
       const char* inputWPs = getKeyboardInput();
+      //memset(inputWPs, 0, sizeof(inputWPs));
       memcpy(StandartWiFiPass, inputWPs, 32);
+      //StandartWiFiPass[sizeof(inputWPs - 1)] = '\0';
       SaveBackUpToEPPR();
       connectToWiFi(wifiTargetSSID, inputWPs);
       delay(100);
     }
     if(weatherSettingsActive)
     {
+      
       if (editlat) 
       {
         editlat = false;
-        weatherLat = String(getKeyboardInput());
-        SaveBackUpToEPPR();
+        const char* inputLat = getKeyboardInput();
+        char buf[12];
+        memset(buf, 0, sizeof(buf));
+        memcpy(buf, inputLat, 12);
+
+        if (DEBUGFLAG) Serial.printf("Enter weatherLat: %s", buf);
+        sanitizeGPSInput(buf);
+        if (DEBUGFLAG) Serial.printf(" After Format: %s", buf);
+        if (buf[0] != 0 && (buf[0] !=  '.'))
+        {
+          weatherLat = String(buf);
+          SaveBackUpToEPPR();
+        }
       }
       if (editlon) 
       {
         editlon = false;
-        weatherLon = String(getKeyboardInput());
-        SaveBackUpToEPPR();
+        const char* inputLon = getKeyboardInput();
+        char buf[12];
+        memset(buf, 0, sizeof(buf));
+        memcpy(buf, inputLon, 12);
+
+        if (DEBUGFLAG) Serial.printf("Enter weatherLon %s", buf);
+        sanitizeGPSInput(buf);
+        if (DEBUGFLAG) Serial.printf(" After Format: %s", buf);
+        if (buf[0] != 0 &&  (buf[0] !=  '.'))
+        {
+          weatherLon = String(buf);
+          SaveBackUpToEPPR();
+        }
       }
       drawWeatherSettings();
     }
@@ -883,7 +921,8 @@ void ShowTFTUserSetup()
 }
 else if (user.tft_driver == 0xE9D) Serial.println("Display driver = ePaper\n");
 
-if (user.tft_driver == 7796) { Serial.print("ST7796_DRIVER  OK"); } else { Serial.print("ST7796_DRIVER      ERROR! , UNCOMENT #define ST7796_DRIVER");}
+if (user.tft_driver == 7796) 
+{ Serial.print("ST7796_DRIVER  OK"); } else { Serial.print("ST7796_DRIVER      ERROR! , UNCOMENT #define ST7796_DRIVER current in Setup is: "); Serial.println(user.tft_driver); }
 
 if (user.pin_tft_mosi == 13) { Serial.print("\nMOSI        OK = "); Serial.print(getPinName(user.pin_tft_mosi)); } else { Serial.print("\nMOSI        = ERROR , NEED 13  | But define is = "); Serial.print(getPinName(user.pin_tft_mosi));}
 if (user.pin_tft_miso == 12) { Serial.print("\nMISO        OK = "); Serial.print(getPinName(user.pin_tft_miso)); } else { Serial.print("\nMISO        = ERROR , NEED 12  | But define is = "); Serial.print(getPinName(user.pin_tft_miso));}
@@ -1045,10 +1084,10 @@ if (pulse.isConnected())
   
   clackBuzzer();
   if (rtcFound)
-    tft.println("RTC module ----------------- OK");
+    tft.println("RTC module ------------------ OK");
   else
   {
-    tft.print("RTC module ----------------- ");
+    tft.print("RTC module ------------------ ");
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
   }
@@ -1060,13 +1099,13 @@ if (pulse.isConnected())
   clackBuzzer();
   if (bmpInit())
   {
-    tft.println("BMP module ----------------- OK");
+    tft.println("BMP module ------------------ OK");
     bmpCalibrateAltitude();
     bmpFound = true;
   }
   else
   {
-    tft.print("BMP module ----------------- ");
+    tft.print("BMP module ------------------ ");
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
     bmpFound = false;
@@ -1075,18 +1114,39 @@ if (pulse.isConnected())
   delay(200);
   tft.setTextColor(TFT_GREEN);
 
+
+  clackBuzzer();
+  if (gps.init(/*timeoutMs=*/1000, /*retries=*/3))
+  {
+    tft.println("GPS module ------------------ OK");
+    if (DEBUGFLAG) Serial.println("[GPS] Module connected: [OK]");
+    GPS_Connected = true;
+  }
+  else
+  {
+    tft.print("GPS module ------------------ ");
+    tft.setTextColor(TFT_RED);
+    tft.println("ERROR");
+      if (DEBUGFLAG)   Serial.println("[GPS] Module connected: [ERROR]");
+    GPS_Connected = false;
+  }
+  tft.println(" ");
+  delay(200);
+  tft.setTextColor(TFT_GREEN);
+  
+
   clackBuzzer();
   if (eepromFound)
   {
-    tft.println("EEPROM module -------------- OK");
+    tft.println("EEPROM module --------------- OK");
     tft.println(" ");
     if (LoadBackUpFromEPPR())
     {
-      tft.println("BACKUP LOAD ---------------- OK");
+      tft.println("BACKUP LOAD ----------------- OK");
     }
     else
     {
-      tft.print("BACKUP LOAD ---------------- ");
+      tft.print("BACKUP LOAD ----------------- ");
       tft.setTextColor(TFT_RED);
       tft.println("ERROR");
       SaveBackUpToEPPR();
@@ -1094,12 +1154,12 @@ if (pulse.isConnected())
   }
   else
   {
-    tft.print("EEPROM module -------------- ");
+    tft.print("EEPROM module --------------- ");
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
     tft.setTextColor(TFT_GREEN);
     tft.println(" ");
-    tft.print("BACKUP LOAD ---------------- ");
+    tft.print("BACKUP LOAD ----------------- ");
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
   }
@@ -1109,10 +1169,10 @@ if (pulse.isConnected())
   delay(200);
   tft.setTextColor(TFT_GREEN);
   if (weatherLoadFromEEPROM())
-    tft.println("WEATHER backup module ------ OK");
+    tft.println("WEATHER backup module ------- OK");
   else
   {
-    tft.print("WEATHER backup module ------ ");
+    tft.print("WEATHER backup module ------- ");
     tft.setTextColor(TFT_RED);
     tft.println("ERROR");
   }
@@ -1120,13 +1180,13 @@ if (pulse.isConnected())
   tft.println(" ");
   delay(200);
   tft.setTextColor(TFT_GREEN);
-  tft.println("Wi-Fi module --------------- OK");
+  tft.println("Wi-Fi module ---------------- OK");
 
   tft.println(" ");
   delay(200);
   tft.setTextColor(TFT_GREEN);
 
-  tft.println("KEYBOARD module ------------ OK");
+  tft.println("KEYBOARD module ------------- OK");
 
 
   radioInit();  // Инициализация радио
@@ -1134,7 +1194,7 @@ if (pulse.isConnected())
   clackBuzzer();
   tft.println(" ");
   delay(200);
-  tft.print("SD card -------------------- ");
+  tft.print("SD card --------------------- ");
   if (sdCardInitialized)
     tft.println("OK");
   else
@@ -1150,7 +1210,7 @@ if (pulse.isConnected())
   tft.println(" ");
   delay(200);
   tft.setTextColor(TFT_GREEN);
-  tft.print("RGB module -----------");
+  tft.print("RGB module ------------");
   delay(200);
   tft.print("--");
   digitalWrite(LED_R, LOW); delay(200);
@@ -1232,20 +1292,25 @@ bool ErrorB = false;
   else
   {  
     char buf[9];
+    
     memset(buf, 0, sizeof(buf));
     memcpy(buf,dataTS.T1Name, 8);
     buf[9] = '\0';
     T1S = String(buf);
+
     memset(buf, 0, sizeof(buf));
     memcpy(buf,dataTS.T2Name, 8);
+    buf[9] = '\0';
     T2S = String(buf);
+
     memset(buf, 0, sizeof(buf));
     memcpy(buf,dataTS.T3Name, 8);
+    buf[9] = '\0';
     T3S = String(buf);
 
     T1h = dataTS.T1hour;
-    T1h = dataTS.T1hour;
-    T1h = dataTS.T1hour;
+    T2h = dataTS.T2hour;
+    T3h = dataTS.T3hour;
 
     T1m = dataTS.T1min;
     T2m = dataTS.T2min;
@@ -1297,6 +1362,8 @@ BackUpTimers dataTS;
   else 
     return false;
 // MP3 Folder
+if (checkSDPath(radioSDFolder.c_str()))
+{
   memset(&dataF, 0, sizeof(BackUpDataFolder));
   strncpy(dataF.SDFolder, radioSDFolder.c_str(), sizeof(dataF.SDFolder) - 1);
   dataF.SDFolder[sizeof(dataF.SDFolder)-1] = '\0';
@@ -1306,6 +1373,8 @@ BackUpTimers dataTS;
   }
   else 
     return false;
+} else
+if (DEBUGFLAG) Serial.printf("Cannot check SD folder %s\n", dataF.SDFolder);
 
 /// Timers
   memset(&dataTS, 0, sizeof(BackUpTimers));
@@ -1463,7 +1532,7 @@ void drawVaultBoy(int16_t cx, int16_t cy, int8_t frame) {
   tft.setTextDatum(MC_DATUM);
 
   String lvlInfo = PERSON_NAME " Level " + String(frame + 1);
-  int widthtext = tft.textWidth(lvlInfo);
+  int widthtext = tft.textWidth(String(lvlInfo + "S"));
   int heighttext = tft.fontHeight();
 
   tft.fillRect((TFT_WIDTH_SCREEN / 2) - (widthtext/2), TAB_Y - heighttext - heighttext / 2 , widthtext + heighttext, heighttext, TFT_BLACK);
@@ -1502,55 +1571,8 @@ void drawPipBoyScreen() {
     tft.print("XP MAX");
   }
 
-  // Left panel
-  tft.setTextSize(1);
-  tft.setCursor(12, 38);
-  tft.setTextColor(TFT_GREEN);
-  if (WiFi.status() == WL_CONNECTED) 
-  {
-    tft.drawRect(9, 35, 29, 15, TFT_GREEN);
-    tft.print("WiFi");
-  }else
-  {
-    tft.print("WiFi");
-  }
-  tft.setCursor(12, 58);
-  if (radioIsPlaying()) 
-      {
-        tft.drawRect(9, 55, 29, 15, TFT_GREEN);
-        tft.print("RAD");
-      }else
-      {
-        tft.print("RAD");
-      }
 
-  tft.setCursor(12, 78);
-  tft.fillRect(9, 75, 35, 15, TFT_BLACK);
-  drawScanlinesButtons(9, 75, 18, 35);
-  CurrentWeather* w = weatherGetCurrent();
-      String src = (w->source == WEATHER_PRIMARY) ? "[W]" : 
-               (w->source == WEATHER_OPENMETEO) ? "[O]" : "[E]";
-      //tft.drawString(src, 310, 35);
-      if ((src == "[W]") || (src == "[O]"))
-      {
-        src = "W " + src;
-        tft.drawRect(9, 75, 35, 15, TFT_GREEN);
-        tft.print(src);
-      }
-      else
-      {
-        if (eepromFound)
-          tft.print("W [E]");
-        else
-        {
-           if (!weatherHasData()) 
-            tft.print("ERR W");
-          else
-            tft.print("ERR E");
-        }
-          
-      }
-  
+  UpdateLeftPanel();
   // Vault Boy
   drawVaultBoy(bitmapStartX, bitmapStartY, vaultFrame);
   
@@ -2013,40 +2035,44 @@ void HandleButtonsScreen4(uint16_t xTouch, uint16_t yTouch) {
 void drawWeatherSettings() {
   weatherSettingsActive = true;
   
-  tft.fillRect(LIST_X, 10, TFT_WIDTH_SCREEN - LIST_X - 5, LIST_W, TFT_BLACK);
-  tft.drawRect(LIST_X, 10, TFT_WIDTH_SCREEN - LIST_X - 5, LIST_W, TFT_GREEN);
-  //tft.drawRect(LIST_X + 2, LIST_Y + 2, LIST_W - 4, LIST_H - 4, tft.color565(0, 100, 0));
+  tft.fillRect(SCREEN_X, SCREEN_Y, SCREEN_W, SCREEN_H, TFT_BLACK);
+  tft.drawRect(SCREEN_X, SCREEN_Y, SCREEN_W, SCREEN_H, TFT_GREEN);
+  //tft.drawRect(SCREEN_X + 2, LIST_Y + 2, LIST_W - 4, LIST_H - 4, tft.color565(0, 100, 0));
   
   tft.setTextColor(TFT_GREEN);
   tft.setTextSize(2);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("WEATHER SETTINGS", LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2, 15);
+  tft.drawString("WEATHER SETTINGS", SCREEN_CENTER, SCREEN_Y + 5);
   
-  tft.setTextDatum(TL_DATUM);
   tft.setTextSize(1);
+  int y = SCREEN_HEADER_Y;
+  //tft.setCursor(SCREEN_X + 10, y + INPUT_FIELD_H / 2);
+  tft.setTextDatum(MR_DATUM);
+  tft.drawString("GPS LATITUDE:", SCREEN_X + 90, y + INPUT_FIELD_H / 2);
+  tft.fillRect(SCREEN_X + 95, y, 110, INPUT_FIELD_H, TFT_BLACK);
+  tft.drawRect(SCREEN_X + 95, y, 110, INPUT_FIELD_H, TFT_GREEN);
+  tft.setTextDatum(ML_DATUM);
+  tft.drawString(weatherLat,SCREEN_X + 100, y + INPUT_FIELD_H / 2);
+  y = y + INPUT_FIELD_H + 15;
+  tft.setCursor(SCREEN_X + 10, y + INPUT_FIELD_H / 2);
+  tft.setTextDatum(MR_DATUM);
+  tft.drawString("GPS LONGITUDE:", SCREEN_X + 90, y + INPUT_FIELD_H / 2);
+  tft.fillRect(SCREEN_X + 95, y, 110, INPUT_FIELD_H, TFT_BLACK);
+  tft.drawRect(SCREEN_X + 95, y, 110, INPUT_FIELD_H, TFT_GREEN);
+  tft.setTextDatum(ML_DATUM);
+  tft.drawString(weatherLon, SCREEN_X + 100, y + INPUT_FIELD_H / 2);
   
-  tft.setCursor(LIST_X + 10, 45);
-  tft.print("GPS LATITUDE:");
-  tft.fillRect(LIST_X + 95, 40, 110, 20, TFT_BLACK);
-  tft.drawRect(LIST_X + 95, 40, 110, 20, TFT_GREEN);
-  tft.setCursor(LIST_X + 100, 47);
-  tft.print(weatherLat);
   
-  tft.setCursor(LIST_X + 10, 65);
-  tft.print("GPS LONGITUDE:");
-  tft.fillRect(LIST_X + 95, 65, 110, 20, TFT_BLACK);
-  tft.drawRect(LIST_X + 95, 65, 110, 20, TFT_GREEN);
-  tft.setCursor(LIST_X + 100, 72);
-  tft.print(weatherLon);
   
-  tft.setCursor(LIST_X + 10, 105);
-  tft.print("UNITS:");
-  
-  int btnX = LIST_X + 80;
-  int btnY = 100;
   int btnW = 60;
-  int btnH = 25;
+  int btnX = SCREEN_CENTER - btnW - 5;
+  int btnH = BUTTON_H;
+  y = y + INPUT_FIELD_H + 15;
+  int btnY = y;
   
+  //tft.setCursor(SCREEN_X + 10, btnY + btnH / 2);
+  tft.setTextDatum(MR_DATUM);
+  tft.drawString("UNITS:", btnX - 5, btnY + btnH/2);
   if (weatherCelsius) {
     tft.fillRect(btnX, btnY, btnW, btnH, TFT_GREEN);
     tft.setTextColor(TFT_BLACK);
@@ -2058,7 +2084,7 @@ void drawWeatherSettings() {
   tft.setTextDatum(MC_DATUM);
   tft.drawString("C", btnX + btnW/2, btnY + btnH/2);
   
-  btnX = LIST_X + 150;
+  btnX = SCREEN_CENTER + 5;
   if (!weatherCelsius) {
     tft.fillRect(btnX, btnY, btnW, btnH, TFT_GREEN);
     tft.setTextColor(TFT_BLACK);
@@ -2068,15 +2094,22 @@ void drawWeatherSettings() {
     tft.setTextColor(TFT_GREEN);
   }
   tft.drawString("F", btnX + btnW/2, btnY + btnH/2);
+
+  if (GPS_Connected) {
+    tft.fillRect(SCREEN_CENTER - 60, btnY + btnH + 10, 120, btnH, TFT_BLACK);
+    tft.drawRect(SCREEN_CENTER - 60, btnY + btnH + 10, 120, btnH, TFT_GREEN);
+    tft.setTextColor(TFT_GREEN);
+    tft.drawString("Insert GPS coords", SCREEN_CENTER, btnY + btnH + 10 + btnH/2);
+  }
   
-  tft.fillRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 65, 150, 60, 25, TFT_BLACK);
-  tft.drawRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 65, 150, 60, 25, TFT_GREEN);
+  tft.fillRect(SCREEN_CENTER - 65, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_BLACK);
+  tft.drawRect(SCREEN_CENTER - 65, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_GREEN);
   tft.setTextColor(TFT_GREEN);
-  tft.drawString("SAVE", LIST_X + ((TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 70/2), 163);
+  tft.drawString("SAVE", SCREEN_X + ((TFT_WIDTH_SCREEN - SCREEN_X - 5)/2 - 70/2), SCREEN_BOTTOM_Y - 5 - BUTTON_H + BUTTON_H / 2 );
   
-  tft.fillRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5, 150, 60, 25, TFT_BLACK);
-  tft.drawRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5, 150, 60, 25, TFT_GREEN);
-  tft.drawString("CANCEL", LIST_X + ((TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 70/2), 163);
+  tft.fillRect(SCREEN_CENTER + 5, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_BLACK);
+  tft.drawRect(SCREEN_CENTER + 5, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_GREEN);
+  tft.drawString("CANCEL", SCREEN_X + ((TFT_WIDTH_SCREEN - SCREEN_X - 5)/2 + 70/2), SCREEN_BOTTOM_Y - 5 - BUTTON_H + BUTTON_H / 2);
   
   tft.setTextColor(tft.color565(0, 100, 0));
   tft.setTextDatum(TC_DATUM);
@@ -2085,16 +2118,16 @@ void drawWeatherSettings() {
     time_t dateUpW = weatherLastUpdate();
     time_t local = myTZ.toLocal(dateUpW, &tcr);
     String stringw = "Last update: " + pad2(day(local)) + "." + pad2(month(local)) + "." + String(year(local)) + " " + pad2(hour(local)) + ":" + pad2(minute(local));
-    tft.drawString(stringw, LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 , 180);
+    tft.drawString(stringw, SCREEN_CENTER , SCREEN_Y + SCREEN_H - BUTTON_H - 10 - 8);
   }
 }
 
 void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
-  if (x < LIST_X || x > TFT_WIDTH_SCREEN - 5 || y < LIST_Y || y > 10 + 186) {
+  if (x < SCREEN_X || x > TFT_WIDTH_SCREEN - 5 || y < SCREEN_HEADER_Y || y > SCREEN_BOTTOM_Y) {
     return;
   }
   
-  if (x >= LIST_X + 100 && x <= LIST_X + 215 && y >= 40 && y <= 60) {
+  if (x >= SCREEN_X + 95 && x <= SCREEN_X + 215 && y >= SCREEN_HEADER_Y && y <= SCREEN_HEADER_Y + INPUT_FIELD_H) {
     digitalWrite(LED_B, LOW);
     delay(30);
     digitalWrite(LED_B, HIGH);
@@ -2106,7 +2139,7 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     return;
   }
   
-  if (x >= LIST_X + 100 && x <= LIST_X + 215 && y >= 65 && y <= 85) {
+  if (x >= SCREEN_X + 95 && x <= SCREEN_X + 215 && y >= SCREEN_HEADER_Y + INPUT_FIELD_H + 15 && y <= SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 ) {
     digitalWrite(LED_B, LOW);
     delay(30);
     digitalWrite(LED_B, HIGH);
@@ -2117,9 +2150,11 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     //drawWeatherSettings();
     return;
   }
-  
+
+  int btnW = 60;
+
 //celsus button
-  if (x >= LIST_X + 80 && x <= LIST_X + 140 && y >= 100 && y <= 125) {
+  if (x >= SCREEN_CENTER - btnW - 5 && x <= SCREEN_CENTER - 5 && y >= SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 && y <= SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 + BUTTON_H) {
     digitalWrite(LED_B, LOW);
     delay(30);
     digitalWrite(LED_B, HIGH);
@@ -2129,7 +2164,7 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     return;
   }
   // farengheit button
-  if (x >= LIST_X + 150 && x <= LIST_X + 210 && y >= 100 && y <= 125) {
+  if (x >= SCREEN_CENTER + 5 && x <= SCREEN_CENTER + btnW + 5 && y >= SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 && y <= SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 + BUTTON_H) {
     digitalWrite(LED_B, LOW);
     delay(30);
     digitalWrite(LED_B, HIGH);
@@ -2138,9 +2173,23 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     drawWeatherSettings();
     return;
   }
-  
+  // gps get
+  if (x >= SCREEN_CENTER - 60 && x <= SCREEN_CENTER + 60 && y >= SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 + BUTTON_H + 10 && y <= SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 + 10 + BUTTON_H*2) {
+  if (gps.hasFix()) {
+    digitalWrite(LED_B, LOW);
+    tft.fillRect(SCREEN_CENTER - 60, SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 + BUTTON_H + 10 , 120, BUTTON_H, TFT_GREEN);
+    delay(30);
+    digitalWrite(LED_B, HIGH);
+    weatherLat = gps.getLat();
+    weatherLon = gps.getLng();
+    clickBuzzer();
+    drawWeatherSettings();
+    return;
+  }
+  }
+
   // OK
-  if (x >= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 65 && x <= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 5 && y >= 150 && y <= 175) {
+  if (x >= SCREEN_CENTER - 65 && x <= SCREEN_CENTER - 5 && y >= SCREEN_BOTTOM_Y - 5 - BUTTON_H && y <= SCREEN_BOTTOM_Y - 5) {
     digitalWrite(LED_G, LOW);
     delay(30);
     digitalWrite(LED_G, HIGH);
@@ -2153,7 +2202,7 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
   }
   
   // CANCEL
-  if (x >= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5 && x <= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 65 && y >= 150 && y <= 175) {
+  if (x >= SCREEN_CENTER + 5 && x <= SCREEN_CENTER + 65 && y >= SCREEN_BOTTOM_Y - 5 - BUTTON_H && y <= SCREEN_BOTTOM_Y - 5) {
     digitalWrite(LED_R, LOW);
     delay(30);
     digitalWrite(LED_R, HIGH);
@@ -2230,18 +2279,18 @@ bool checkSDPath(const char* path) {
 void drawTimeSettings()
 {
   timeSettingsActive = true;
-  tft.fillRect(LIST_X, 10, TFT_WIDTH_SCREEN - LIST_X - 5, LIST_W, TFT_BLACK);
-  tft.drawRect(LIST_X, 10, TFT_WIDTH_SCREEN - LIST_X - 5, LIST_W, TFT_GREEN);
+  tft.fillRect(SCREEN_X, SCREEN_Y, SCREEN_W, SCREEN_H, TFT_BLACK);
+  tft.drawRect(SCREEN_X, SCREEN_Y, SCREEN_W, SCREEN_H, TFT_GREEN);
 
   tft.setTextColor(TFT_GREEN);
   tft.setTextSize(2);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("TIMER SETTINGS", LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2, 15);
+  tft.drawString("TIMER SETTINGS", SCREEN_CENTER, 15);
   tft.setTextSize(1);
 
-      tft.setCursor(LIST_X + 10, 110);
-      
-      int fieldX = LIST_X + 10, fieldY = 35, fieldW = 100, fieldH = 20, feldPad = 5;
+      tft.setCursor(SCREEN_X + 10, 110);
+      //int timersFH = tft.fontHeight();
+      int fieldX = SCREEN_X + 10, fieldY = SCREEN_HEADER_Y, fieldW = 100, fieldH = INPUT_FIELD_H, feldPad = 5;
 
       for (int i = 1; i <= 3; i++)
       {
@@ -2277,24 +2326,25 @@ void drawTimeSettings()
   // SAVE / CANCEL
   tft.setTextDatum(MC_DATUM);
   tft.setTextColor(TFT_GREEN);
-  tft.fillRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 65, 150, 60, 25, TFT_BLACK);
-  tft.drawRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 65, 150, 60, 25, TFT_GREEN);
-  tft.drawString("SAVE", LIST_X + ((TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 35), 163);
 
-  tft.fillRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5, 150, 60, 25, TFT_BLACK);
-  tft.drawRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5, 150, 60, 25, TFT_GREEN);
-  tft.drawString("CANCEL", LIST_X + ((TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 35), 163);
+  tft.fillRect(SCREEN_CENTER - 65, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_BLACK);
+  tft.drawRect(SCREEN_CENTER - 65, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_GREEN);
+  tft.drawString("SAVE", SCREEN_X + ((SCREEN_W)/2 - 35), SCREEN_BOTTOM_Y - 5 - BUTTON_H/2);
+
+  tft.fillRect(SCREEN_CENTER + 5, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_BLACK);
+  tft.drawRect(SCREEN_CENTER + 5, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_GREEN);
+  tft.drawString("CANCEL", SCREEN_X + ((SCREEN_W)/2 + 35), SCREEN_BOTTOM_Y - 5 - BUTTON_H/2);
 }
 
 
 void HandleTimeSettings(uint16_t x, uint16_t y)
 {
 
-  if (x < LIST_X || x > TFT_WIDTH_SCREEN - 5 || y < 10 || y > 10 + 186) return;
+  if (x < SCREEN_X || x > SCREEN_W + SCREEN_X || y < SCREEN_Y || y > SCREEN_Y + SCREEN_H) return;
   clickBuzzer();
   if (timeSettingsActive)
   {
-     int fieldX = LIST_X + 10, fieldY = 35, fieldW = 100, fieldH = 20, feldPad = 5;
+     int fieldX = SCREEN_X + 10, fieldY = SCREEN_HEADER_Y, fieldW = 100, fieldH = INPUT_FIELD_H, feldPad = 5;
       //if (DEBUGFLAG)  Serial.print("Touch in screen. Field value:");
    for (int i = 1; i <= 3; i++)
       {
@@ -2332,21 +2382,20 @@ void HandleTimeSettings(uint16_t x, uint16_t y)
       }
 
       // SAVE
-  if (x >= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 65 && x <= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 5 && y >= 150 && y <= 175) {
+
+  if (x >= SCREEN_CENTER - 65 && x <= SCREEN_CENTER - 5 && y >= SCREEN_BOTTOM_Y - 5 - BUTTON_H && y <= SCREEN_BOTTOM_Y - 5) {
     digitalWrite(LED_G, LOW); delay(30); digitalWrite(LED_G, HIGH);
-    radioSettingsActive = false;
-    if (radioPlaySource == 0 && checkSDPath(radioSDFolder.c_str())) {
+    timeSettingsActive = false;
       SaveBackUpToEPPR();
       //loadSDPlaylist();   // вызов из radio_module
-    }
     drawPipBoyScreen4();
     return;
   }
 
   // CANCEL
-  if (x >= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5 && x <= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 65 && y >= 150 && y <= 175) {
+  if (x >= SCREEN_CENTER + 5 && x <= SCREEN_CENTER + 65 && y >= SCREEN_BOTTOM_Y - 5 - BUTTON_H && y <= SCREEN_BOTTOM_Y - 5) {
     digitalWrite(LED_R, LOW); delay(30); digitalWrite(LED_R, HIGH);
-    radioSettingsActive = false;
+    timeSettingsActive = false;
     drawPipBoyScreen4();
     return;
   }
@@ -2358,21 +2407,20 @@ void HandleTimeSettings(uint16_t x, uint16_t y)
 
 void drawRadioSettings() {
   radioSettingsActive = true;
-  tft.fillRect(LIST_X, 10, TFT_WIDTH_SCREEN - LIST_X - 5, LIST_W, TFT_BLACK);
-  tft.drawRect(LIST_X, 10, TFT_WIDTH_SCREEN - LIST_X - 5, LIST_W, TFT_GREEN);
+  tft.fillRect(SCREEN_X, SCREEN_Y, SCREEN_W, SCREEN_H, TFT_BLACK);
+  tft.drawRect(SCREEN_X, SCREEN_Y, SCREEN_W, SCREEN_H, TFT_GREEN);
 
   tft.setTextColor(TFT_GREEN);
   tft.setTextSize(2);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("RADIO SETTINGS", LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2, 15);
+  tft.drawString("RADIO SETTINGS", SCREEN_CENTER, 15);
 
-  tft.setTextDatum(TL_DATUM);
   tft.setTextSize(1);
-  //tft.setCursor(LIST_X + 10, 45);
-  tft.drawString("Select mp3 radio:",LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2, 40 );
+  //tft.setCursor(SCREEN_X + 10, 45);
+  tft.drawString("Select mp3 radio:", SCREEN_CENTER, SCREEN_HEADER_Y );
 
-  int btnW = 60, btnH = 25, btnY = 60;
-  int startX = LIST_X + 12;
+  int btnW = 60, btnH = BUTTON_H, btnY = SCREEN_HEADER_Y + 20;
+  int startX = SCREEN_CENTER - (btnW * 3 + 10 * 2) / 2;
 
   // SD
   if (radioPlaySource == 0) {
@@ -2406,16 +2454,15 @@ void drawRadioSettings() {
 
   // Поле папки (только если SD)
   if (radioPlaySource == 0) {
-    tft.setTextDatum(TL_DATUM);
     tft.setTextColor(TFT_GREEN);
     if (!sdCardInitialized)
     {
-      tft.drawString("Insert SD card",LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2, 120);
+      tft.drawString("Insert SD card",SCREEN_CENTER, SCREEN_HEADER_Y + BUTTON_H + 45);
     } else
     {
-      tft.setCursor(LIST_X + 10, 110);
+      tft.setCursor(SCREEN_X + 10, SCREEN_HEADER_Y + BUTTON_H + INPUT_FIELD_H/2 + 15);
       tft.print("Folder:");
-      int fieldX = LIST_X + 70, fieldY = 105, fieldW = 150, fieldH = 20;
+      int fieldX = SCREEN_X + 70, fieldY = SCREEN_HEADER_Y + BUTTON_H + INPUT_FIELD_H/2 + 15, fieldW = 150, fieldH = INPUT_FIELD_H;
       tft.fillRect(fieldX, fieldY, fieldW, fieldH, TFT_BLACK);
       tft.drawRect(fieldX, fieldY, fieldW, fieldH, TFT_GREEN);
       tft.setCursor(fieldX + 5, fieldY + 5);
@@ -2425,24 +2472,24 @@ void drawRadioSettings() {
     }
 
   }
-
   // SAVE / CANCEL
   tft.setTextDatum(MC_DATUM);
   tft.setTextColor(TFT_GREEN);
-  tft.fillRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 65, 150, 60, 25, TFT_BLACK);
-  tft.drawRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 65, 150, 60, 25, TFT_GREEN);
-  tft.drawString("SAVE", LIST_X + ((TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 35), 163);
 
-  tft.fillRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5, 150, 60, 25, TFT_BLACK);
-  tft.drawRect(LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5, 150, 60, 25, TFT_GREEN);
-  tft.drawString("CANCEL", LIST_X + ((TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 35), 163);
+  tft.fillRect(SCREEN_CENTER - 65, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_BLACK);
+  tft.drawRect(SCREEN_CENTER - 65, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_GREEN);
+  tft.drawString("SAVE", SCREEN_X + ((SCREEN_W)/2 - 35), SCREEN_BOTTOM_Y - 5 - BUTTON_H/2);
+
+  tft.fillRect(SCREEN_CENTER + 5, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_BLACK);
+  tft.drawRect(SCREEN_CENTER + 5, SCREEN_BOTTOM_Y - 5 - BUTTON_H, 60, BUTTON_H, TFT_GREEN);
+  tft.drawString("CANCEL", SCREEN_X + ((SCREEN_W)/2 + 35), SCREEN_BOTTOM_Y - 5 - BUTTON_H/2);
 }
 
 void handleRadioSettingsTouch(uint16_t x, uint16_t y) {
-  if (x < LIST_X || x > TFT_WIDTH_SCREEN - 5 || y < 10 || y > 10 + 186) return;
+  if (x < SCREEN_X || x > (SCREEN_W + SCREEN_X) || y < SCREEN_Y || y > SCREEN_Y + SCREEN_H) return;
 
-  int btnY = 60, btnH = 25, btnW = 60;
-  int startX = LIST_X + 12;
+  int btnY = SCREEN_HEADER_Y + 20, btnH = BUTTON_H, btnW = 60;
+   int startX = SCREEN_CENTER - (btnW * 3 + 10 * 2) / 2;
 
   // SD button
   if (y >= btnY && y <= btnY + btnH && x >= startX && x <= startX + btnW) {
@@ -2471,16 +2518,17 @@ void handleRadioSettingsTouch(uint16_t x, uint16_t y) {
   }
 
   // Поле Folder (только SD)
-  if (radioPlaySource == 0 && x >= LIST_X + 70 && x <= LIST_X + 220 && y >= 105 && y <= 125) {
+  if (radioPlaySource == 0 && sdCardInitialized &&  x >= SCREEN_X + 70 && x <= SCREEN_X + 220 && y >= SCREEN_HEADER_Y + BUTTON_H + INPUT_FIELD_H/2 + 15 && y <= SCREEN_HEADER_Y + BUTTON_H + INPUT_FIELD_H/2 + 15 + INPUT_FIELD_H) {
     digitalWrite(LED_B, LOW); delay(30); digitalWrite(LED_B, HIGH);
     clickBuzzer();
     showKeyboard(radioSDFolder.c_str());
     return;
   }
 
+
   // SAVE
-  if (x >= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 65 && x <= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 - 5 && y >= 150 && y <= 175) {
-    digitalWrite(LED_G, LOW); delay(30); digitalWrite(LED_G, HIGH);
+  if (x >= SCREEN_CENTER - 65 && x <= SCREEN_CENTER - 5 && y >= SCREEN_BOTTOM_Y - 5 - BUTTON_H && y <= SCREEN_BOTTOM_Y - 5) {
+     digitalWrite(LED_G, LOW); delay(30); digitalWrite(LED_G, HIGH);
     radioSettingsActive = false;
     if (radioPlaySource == 0 && checkSDPath(radioSDFolder.c_str())) {
       SaveBackUpToEPPR();
@@ -2492,7 +2540,7 @@ void handleRadioSettingsTouch(uint16_t x, uint16_t y) {
   }
 
   // CANCEL
-  if (x >= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 5 && x <= LIST_X + (TFT_WIDTH_SCREEN - LIST_X - 5)/2 + 65 && y >= 150 && y <= 175) {
+   if (x >= SCREEN_CENTER + 5 && x <= SCREEN_CENTER + 65 && y >= SCREEN_BOTTOM_Y - 5 - BUTTON_H && y <= SCREEN_BOTTOM_Y - 5) {
     digitalWrite(LED_R, LOW); delay(30); digitalWrite(LED_R, HIGH);
     radioSettingsActive = false;
     clickBuzzer();
@@ -2622,19 +2670,19 @@ void drawRadioSetButtons() {
     tft.setTextColor(TFT_GREEN);
     tft.setTextDatum(MC_DATUM);
     tft.setTextSize(TAB_TEXT_SIZE);
-    int x = (TFT_WIDTH_SCREEN / 6) - 2;
-    int y = TAB_Y - TAB_H - 5;
+    int x = RADIO_B_X;
+    int y = RADIO_B_Y;
     for (int i = 0; i < 6; i++) {
-      tft.fillRect(x * i + 5, y, x, TAB_H, TFT_BLACK);
-      drawScanlinesButtons(x * i + 5, y, TAB_H, (TFT_WIDTH_SCREEN / 6));
-      tft.drawRect(x * i + 5, y, x, TAB_H, TFT_GREEN);
+      tft.fillRect(x * i + 5, y, x, RADIO_B_H, TFT_BLACK);
+      drawScanlinesButtons(x * i + 5, y, RADIO_B_H, (TFT_WIDTH_SCREEN / 6));
+      tft.drawRect(x * i + 5, y, x, RADIO_B_H, TFT_GREEN);
       switch(i) {
-        case 0: tft.drawString("Play", x * i + 5 + x/2, y + TAB_H/2); break;
-        case 1: tft.drawString("Pause", x * i + 5 + x/2, y + TAB_H/2); break;
-        case 2: tft.drawString("Prev", x * i + 5 + x/2, y + TAB_H/2); break;
-        case 3: tft.drawString("Next", x * i + 5 + x/2, y + TAB_H/2); break;
-        case 4: tft.drawString("Vol -", x * i + 5 + x/2, y + TAB_H/2); break;
-        case 5: tft.drawString("Vol +", x * i + 5 + x/2, y + TAB_H/2); break;
+        case 0: tft.drawString("Play", x * i + 5 + x/2, y + RADIO_B_H/2); break;
+        case 1: tft.drawString("Pause", x * i + 5 + x/2, y + RADIO_B_H/2); break;
+        case 2: tft.drawString("Prev", x * i + 5 + x/2, y + RADIO_B_H/2); break;
+        case 3: tft.drawString("Next", x * i + 5 + x/2, y + RADIO_B_H/2); break;
+        case 4: tft.drawString("Vol -", x * i + 5 + x/2, y + RADIO_B_H/2); break;
+        case 5: tft.drawString("Vol +", x * i + 5 + x/2, y + RADIO_B_H/2); break;
       }
       
     }
@@ -2737,7 +2785,6 @@ void updateLevel(int8_t frame)
 }
 
 void updateHPAP() {
-  bool psActive = false;
 
   if (pulseSensFound)
   {
@@ -2833,6 +2880,85 @@ uint8_t minutesUntil(uint8_t targetH, uint8_t targetM) {
     return (diff > 240) ? 240 : (uint8_t)diff;
 }
 
+
+void UpdateLeftPanel()
+{
+  // Left panel
+  tft.setTextColor(TFT_GREEN);
+  tft.setTextSize(LEFTPANEL_TEXT_SIZE);
+  tft.setTextDatum(MC_DATUM);
+  int yStartP = 38;
+  int heighttext = tft.fontHeight();
+
+  tft.fillRect(9, yStartP - 2, 35, (heighttext + 8) * 5, TFT_BLACK);
+  drawScanlinesButtons(9, yStartP - 2, 100, 37);
+  tft.setCursor(12, yStartP);
+  if (WiFi.status() == WL_CONNECTED) 
+  {
+    tft.drawRect(9, yStartP - 2, 29, heighttext + 4, TFT_GREEN);
+    tft.print("WiFi");
+  }else
+  {
+    tft.print("WiFi");
+  }
+  
+  yStartP = yStartP + heighttext + 8;
+  tft.setCursor(12, yStartP);
+  if (radioIsPlaying()) 
+      {
+        tft.drawRect(9, yStartP - 2, 29, heighttext + 4, TFT_GREEN);
+        tft.print("RAD");
+      }else
+      {
+        tft.print("RAD");
+      }
+
+  
+  if (GPS_Connected) 
+      {
+        yStartP = yStartP + heighttext + 8;
+        tft.setCursor(12, yStartP);
+        if (gps.hasFix()) tft.drawRect(9, yStartP - 2, 29, heighttext + 4, TFT_GREEN);
+        tft.print("GPS");
+      }
+
+  if (pulseSensFound) 
+      {
+        yStartP = yStartP + heighttext + 8;
+        tft.setCursor(12, yStartP);
+        if (psActive) tft.drawRect(9, yStartP - 2, 35,  heighttext + 4, TFT_GREEN);
+        tft.print("PULSE");
+      }
+
+  yStartP = yStartP + heighttext + 8;
+  tft.setCursor(12, yStartP);
+  //tft.fillRect(9, yStartP - 2, 35, 15, TFT_BLACK);
+  //drawScanlinesButtons(9, yStartP - 2, 18, 35);
+  CurrentWeather* w = weatherGetCurrent();
+      String src = (w->source == WEATHER_PRIMARY) ? "[W]" : 
+               (w->source == WEATHER_OPENMETEO) ? "[O]" : "[E]";
+      //tft.drawString(src, 310, 35);
+      if ((src == "[W]") || (src == "[O]"))
+      {
+        src = "W " + src;
+        tft.drawRect(9, yStartP - 2, 35, heighttext + 4, TFT_GREEN);
+        tft.print(src);
+      }
+      else
+      {
+        if (eepromFound)
+          tft.print("W [E]");
+        else
+        {
+           if (!weatherHasData()) 
+            tft.print("ERR W");
+          else
+            tft.print("ERR E");
+        }
+          
+      }
+}
+
 void UpdateRightPanel()
 {
       tft.setTextColor(TFT_GREEN);
@@ -2841,9 +2967,6 @@ void UpdateRightPanel()
 
         // Right panel
   
-
-
-      
   String Stringbase = "(DDD)SSSSSSSS";
   int widthtext = tft.textWidth(Stringbase);
   int heighttext = tft.fontHeight();
@@ -2851,22 +2974,18 @@ void UpdateRightPanel()
       int XstartRight = TFT_WIDTH_SCREEN - widthtext - 2;
       int YstartRight = 45;
 
-      tft.fillRect(XstartRight, YstartRight - 2, TFT_WIDTH_SCREEN-XstartRight, (heighttext + 6) * 3, TFT_BLACK);
-      drawScanlinesButtons(XstartRight, YstartRight-2, (heighttext + 6) * 3 + 2
-      
-      
-      
-      , TFT_WIDTH_SCREEN-XstartRight);
+      tft.fillRect(XstartRight, YstartRight - 2, TFT_WIDTH_SCREEN-XstartRight, (heighttext + 8) * 3, TFT_BLACK);
+      drawScanlinesButtons(XstartRight, YstartRight-2, (heighttext + 8) * 3 + 2, TFT_WIDTH_SCREEN-XstartRight);
       if (isValidString(T1S)){
         tft.setCursor(XstartRight, YstartRight);
         tft.printf("(%d)%s", minutesUntil(T1h,T1m),T1S);
       }
       if (isValidString(T2S)){
-        tft.setCursor(XstartRight, YstartRight + heighttext + 6);
+        tft.setCursor(XstartRight, YstartRight + heighttext + 8);
         tft.printf("(%d)%s", minutesUntil(T2h,T2m),T2S);
       }
       if (isValidString(T3S)){
-        tft.setCursor(XstartRight, YstartRight + heighttext + 6);
+        tft.setCursor(XstartRight, YstartRight + heighttext * 2 + 8 * 2);
         tft.printf("(%d)%s", minutesUntil(T3h,T3m),T3S);
       }
 
@@ -2882,6 +3001,27 @@ void sanitizeTimeInput(char* input) {
         }
     }
     input[j] = '\0';
+}
+
+void sanitizeGPSInput(char* input) {
+    
+    int j = 0;
+    for (int i = 0; input[i] != '\0'; i++) {
+        if ((input[i] >= '0' && input[i] <= '9') || input[i] == '.' || input[i] == '-' ) {
+          if (i == 0)
+          {
+            if (input[0] == '-' || (input[0] >= '0' && input[0] <= '9'))
+              input[j++] = input[0];
+          } else
+          {
+            if (input[i] != '-' )
+              input[j++] = input[i];
+          }
+        }
+    }
+    input[j] = '\0';
+    //input = buf;
+    //return buf;
 }
 
 // Парсинг времени по флагу
@@ -3061,7 +3201,7 @@ void drawWeatherPanelCenter(int cx, int y, int w, int h)
   drawWeatherIconCentered(cx, y + 80, weatherPtr->condition, TFT_GREEN);
 
   tft.setTextSize(1);
-  tft.setTextDatum(TL_DATUM);
+  tft.setTextDatum(TC_DATUM);
 
   // --- Ветер — смещение от центра на половину ширины текста ---
   tw = tft.textWidth("Wind:     188 km/h");
@@ -3076,16 +3216,10 @@ void drawWeatherPanelCenter(int cx, int y, int w, int h)
       tft.fillRect(coordX, windY - 7, tw, 35, TFT_BLACK);
       drawScanlinesButtons(coordX, windY - 7, 35, tw);
 
-  tft.drawString("Wind:      " + String(weatherPtr->wind.c_str()) + " km/h",windX, windY);
-  drawWindArrow(windX + 35, windY + 3, weatherPtr->windDir, 20, TFT_WHITE);
-  tft.drawString(crdStr,coordX, coordY);
+  tft.drawString("Wind:      " + String(weatherPtr->wind.c_str()) + " km/h",cx, windY);
+  drawWindArrow(windX + 46, windY + 3, weatherPtr->windDir, 20, TFT_WHITE);
+  tft.drawString(crdStr,cx, coordY);
  
-  //tft.setCursor(cx - halfW / 2 + 20, coordY);
-  //tft.print("Coords: ");
-  //tft.print(weatherLat.substring(0, 7));
-  //tft.print(", ");
-  //tft.print(weatherLon.substring(0, 7));
-  
   // --- Проверка устаревания ---
   if (!weatherHasData() || (WiFi.status() != WL_CONNECTED)) {
     int mins = weatherGetAgeMinutes();
@@ -3197,30 +3331,10 @@ void drawBMPPanel(int x, int y, int w, int h)
 
 
 // ============================================================
-// Время обновления — под рамками, над TAB_H
+// Время обновления на экране weather — под рамками, над TAB_H
 // ============================================================
 void drawUpdateInfo()
 {
-
-  tft.setTextDatum(TC_DATUM);
-  tft.setTextColor(tft.color565(0, 100, 0));
-  tft.setTextSize(1);
-  
-  int tw = tft.textWidth("Updated: 88.88.8888 88:88 (WIFI OFF)");
-  int th = tft.fontHeight();
-  int cx = (TFT_WIDTH_SCREEN) / 2 - tw;
-  int cy = SCREEN_BOTTOM_Y - 10;
-      tft.fillRect(cx, cy, tw, th, TFT_BLACK);
-      drawScanlinesButtons(cx, cy, th, tw);
-      
-  //String WeUpStr = "Updated: " + 
-  tft.setCursor(cx + (tw / 2), cy);
-  tft.print("Updated: ");
- // updateWeatherTimeDisplay();  // Твоя существующая функция
-//}
-
-
-//void updateWeatherTimeDisplay() {
   CurrentWeather* w = weatherGetCurrent();
   if (!weatherHasData()) return;
   
@@ -3246,61 +3360,46 @@ void drawUpdateInfo()
     }
   }
   
-  // Координаты поля времени
-  int timeXW = cx + 54;//(TFT_WIDTH_SCREEN/2) - 100 + 54;  // После "Updated: "
-  int timeYW = cy; //190;
-  //int timeW = 100;
-  //int timeH = 12;
-  
-  tft.setTextColor(isOld ? TFT_ORANGE : TFT_GREEN);
-  //tft.setCursor(timeXW, timeYW);
-  
-
   if (WiFi.status() == WL_CONNECTED) {
     if (!isOld)
     {
-
       stringw = stringw + String(mins) + " min ago";
-      //tft.print(mins);
-      //tft.print(" min ago");
     }
-    //else
-      //tft.print(stringw);
-
   } else {
     if (!isOld)
     {
       stringw = stringw + String(mins) + " min ago" + " (WiFi OFF)";
-      //tft.print(mins);
-      //tft.print(" min ago");
-      //tft.print(" (WiFi OFF)");
     }
     else
     {
-      //tft.print(stringw);
-      //tft.print(" (WiFi OFF)");
       stringw = stringw + " (WiFi OFF)";
     }
   }
-  tft.drawString(stringw, (TFT_WIDTH_SCREEN) / 2, cy);
+  tft.setTextSize(1);
+  int tw = tft.textWidth(stringw);
+  int tuw = tft.textWidth("Updated: ");
+  int th = tft.fontHeight();
+  tft.fillRect(TFT_WIDTH_SCREEN / 2 - tw / 2 - tuw, SCREEN_BOTTOM_Y - th, tuw + tw, th, TFT_BLACK);
+  drawScanlinesButtons(TFT_WIDTH_SCREEN / 2 - tw / 2 - tuw, SCREEN_BOTTOM_Y - th, th, tuw + tw); 
+  tft.setTextColor(tft.color565(0, 100, 0));
+  tft.setTextDatum(BR_DATUM);
+  tft.drawString("Updated: ", TFT_WIDTH_SCREEN / 2 - tw / 2, SCREEN_BOTTOM_Y);
+  tft.setTextColor(isOld ? TFT_ORANGE : TFT_GREEN);
+  tft.setTextDatum(BC_DATUM);
+  tft.drawString(stringw, TFT_WIDTH_SCREEN / 2, SCREEN_BOTTOM_Y);
 
   // Индикатор источника
   tft.setTextSize(1);
-  tft.setTextDatum(TR_DATUM);
+  tft.setTextDatum(TL_DATUM);
   tft.setTextColor(tft.color565(0, 100, 0));
   // Закрасить старое значение
   String src = (w->source == WEATHER_PRIMARY) ? "[W]" : 
                (w->source == WEATHER_OPENMETEO) ? "[O]" : "[E]";
   int tws = tft.textWidth(src);             
-  tft.fillRect(TFT_WIDTH_SCREEN - tws - 5, 10, 20, 20, TFT_BLACK); 
-  drawScanlinesButtons(TFT_WIDTH_SCREEN - tws - 5, 10, 24, 20);
-  tft.drawString(src, TFT_WIDTH_SCREEN - 5, 15);
-  // Предупреждение о старых данных
-  //if (isOld) {
-  //  tft.setTextColor(TFT_RED);
-  //  tft.setCursor(60, 215);
-   // tft.print("Data expired!     ");
-  //}
+  tft.fillRect(TFT_WIDTH_SCREEN - tws - 5, 10, tws + 5, th, TFT_BLACK); 
+  drawScanlinesButtons(TFT_WIDTH_SCREEN - tws - 5, 10, th+2, tws + 5);
+  tft.drawString(src, TFT_WIDTH_SCREEN - tws - 5, 10);
+
   
 }
 
@@ -3486,6 +3585,8 @@ void pipboyBootSound() {
 // Неблокирующий радиационный треск (счётчик Гейгера)
 // level: 0=выкл, 1=фоновая радиация, 10=критическая масса
 void geigerTick(int level) {
+  if (radioIsPlaying())
+    return;
   static unsigned long lastTick = 0;
   static unsigned long toneEnd = 0;
   static unsigned long pauseMs = 0;
@@ -3512,8 +3613,8 @@ void geigerTick(int level) {
       noTone(BUZZER_PIN);
       sounding = false;
       // Случайная пауза до следующего щелчка (уровень сокращает интервал)
-      int minPause = map(level, 1, 14, 1200, 30);
-      int maxPause = map(level, 1, 14, 5000, 60);
+      int minPause = map(level, 1, 14, 1200, 50);
+      int maxPause = map(level, 1, 14, 5000, 260);
       pauseMs = random(minPause, maxPause + 1);
       lastTick = millis();
     }
@@ -3527,9 +3628,9 @@ void geigerTick(int level) {
 
   // Проверяем, не подошло ли время щёлкнуть
   if (millis() - lastTick >= pauseMs) {
-    int freq = random(50, 65);      // случайная высота щелчка
-    int duration = random(6, 10);       // случайная длительность
-    ledcWrite(BUZZER_PIN, 128);
+    int freq = random(50, 85);      // случайная высота щелчка
+    int duration = random(5, 8);       // случайная длительность
+    //ledcWrite(BUZZER_PIN, 128);
     tone(BUZZER_PIN, freq);
     noTone(BUZZER_PIN);
     //pinmode

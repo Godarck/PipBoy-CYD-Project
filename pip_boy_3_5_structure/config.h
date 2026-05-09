@@ -60,8 +60,12 @@
 #define BMP280_ADDRESS 0x76
 
 // ======================= Pulse Sensor 3 pin Analog ======================= 
-#define PULSE_SENSOR_PIN    35 
+#define PULSE_SENSOR_PIN    255 
 //#define PULSE_SENSOR_VCC 8
+
+// ======================= GPS GY-NE06MV2 ======================= 
+#define GPS_ONTX_PIN 32
+#define GPS_ONRX_PIN 35
 
 // ======================= WiFi / NTP =======================
 #define NTP_SERVER "pool.ntp.org"
@@ -98,7 +102,7 @@
 #define TAB_TEXT_SIZE 2
 #define LVL_TEXT_SIZE 3
 #define TIMERS_TEXT_SIZE 1
-
+#define LEFTPANEL_TEXT_SIZE 1
 #define KEYBOARD_X 5
 #define KEYBOARD_Y 5
 #define KEY_GAP 2
@@ -107,14 +111,27 @@
 #define KEY_W ((KEYBOARD_W - KEY_GAP * 12) / 10 )//28
 #define KEY_H ((KEYBOARD_H - KEYBOARD_Y - 28 - 22 - KEY_GAP * 14)/6 )//24 KEYBOARD_H - KEY_H - KEY_GAP - 4
 
-
+// ================== UI SETUPS SCREEN dimensions =============
 #define  SCREEN_HEADER_Y  40      // Нижняя граница заголовка "WEATHER"
 #define  SCREEN_BOTTOM_Y  (TFT_HEIGHT_SCREEN - TAB_H - 5) // Верхняя граница TAB_H
 #define  SCREEN_CONTENT_H  (SCREEN_BOTTOM_Y - SCREEN_HEADER_Y) // Доступная высота 
+#define  SCREEN_X 85
+#define  SCREEN_Y 10
+#define  SCREEN_H (SCREEN_BOTTOM_Y - SCREEN_Y)
+#define  SCREEN_W (TFT_WIDTH_SCREEN - LIST_X - 5)
+#define  SCREEN_CENTER (SCREEN_X + (TFT_WIDTH_SCREEN - SCREEN_X - 5)/2)
+#define  BUTTON_H 30
+#define  INPUT_FIELD_H 20
+
+// ================== UI RADIO BUTTONS =================
+#define RADIO_B_X ((TFT_WIDTH_SCREEN / 6) - 2)
+#define RADIO_B_Y (TAB_Y - TAB_H - 5)
+#define RADIO_B_H TAB_H
 
 // ================== WiFi list dimensions =============
 #define LIST_X 85
 #define LIST_Y 40
+//#define tab_b_W  70
 #define LIST_W (TFT_WIDTH_SCREEN - LIST_X  - 35 - 5 )
 #define LIST_H (TFT_HEIGHT_SCREEN - LIST_Y- TAB_H - 10)
 #define LIST_ITEM_H 20

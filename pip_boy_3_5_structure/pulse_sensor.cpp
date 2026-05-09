@@ -8,6 +8,8 @@ PulseSensor::PulseSensor(uint8_t sensorPin, uint8_t beepPin) {
 }
 
 void PulseSensor::begin() {
+    if (pinSensor >= 255)
+    return;
     pinMode(pinSensor, INPUT);
     analogReadResolution(12);
     analogSetAttenuation(ADC_11db);
@@ -29,8 +31,8 @@ void PulseSensor::begin() {
     flagBEP = (pinBeep < 255);
     dataBEP = false;
     if (flagBEP) {
-        //pinMode(pinBeep, OUTPUT);
-        //digitalWrite(pinBeep, LOW);
+        pinMode(pinBeep, OUTPUT);
+        digitalWrite(pinBeep, LOW);
     }
     
     lastSample = 0;
@@ -87,6 +89,8 @@ bool PulseSensor::isChanged() {
 // ======================= ОБРАБОТКА =======================
 
 void PulseSensor::processSample() {
+    if (pinSensor >= 255)
+    return;
     timeCNT++;
     
     if (timeCNT % 4 == 0) {
@@ -139,7 +143,7 @@ void PulseSensor::processSample() {
         if (flagBEP && flagVAL && timeTOP > 0 && timeTOP < 25) {
             dataBEP = !dataBEP;
             //digitalWrite(pinBeep, dataBEP);
-						//tone(pinBeep, 600, 5);
+						tone(pinBeep, 600, 8);
         }
     }
 }

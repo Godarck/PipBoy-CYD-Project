@@ -131,16 +131,16 @@ void initKeyboard() {
   // ESC
   keys[keyCount].x = KEYBOARD_X + 5; //KEYBOARD_W - 50;
   keys[keyCount].y = KEYBOARD_Y + 22;
-  keys[keyCount].w = 45;
+  keys[keyCount].w = KEY_W * 2 + KEY_GAP;
   keys[keyCount].h = 28;
   keys[keyCount].type = 6;
   strcpy(keys[keyCount].label, "ESC");
   keyCount++;
 
   // Backspace
-  keys[keyCount].x = KEYBOARD_X + KEYBOARD_W - 50;
+  keys[keyCount].x = TFT_WIDTH_SCREEN - KEYBOARD_X*2 - KEY_W * 2 - KEY_GAP;
   keys[keyCount].y = KEYBOARD_Y + 10;//+ KEY_H + KEY_GAP;
-  keys[keyCount].w = 45;
+  keys[keyCount].w = KEY_W * 2 + KEY_GAP;
   keys[keyCount].h = 40;
   keys[keyCount].type = 1;
   strcpy(keys[keyCount].label, "DEL");
@@ -188,7 +188,7 @@ void drawKeyboard() {
   tft.drawRect(KEYBOARD_X, KEYBOARD_Y, KEYBOARD_W, KEYBOARD_H, TFT_GREEN);
  
   // Поле ввода
-  tft.drawRect(KEYBOARD_X + 55, KEYBOARD_Y + 28, KEYBOARD_W - 110, 22, TFT_GREEN);
+  //tft.drawRect(KEYBOARD_X + 5 + KEY_W * 2 + KEY_GAP*2, KEYBOARD_Y + 28, KEYBOARD_W - KEY_W * 4 - KEY_GAP *4 , 22, TFT_GREEN);
   
   // Клавиши
   for (int i = 0; i < keyCount; i++) {
@@ -202,7 +202,8 @@ void drawKeyboard() {
   tft.setCursor(KEYBOARD_X + 8, KEYBOARD_Y + 8);
   tft.print("VAULT-TEC KEYBOARD v1.0");
   //tft.drawString("VAULT-TEC KEYBOARD v1.0", KEYBOARD_X + 8, KEYBOARD_Y + 8);
-  
+
+    // Поле ввода
   redrawInputField();
 }
 
@@ -222,11 +223,12 @@ static void drawKey(Key* k, bool pressed) {
 }
 
 static void redrawInputField() {
-  tft.fillRect(KEYBOARD_X + 57, KEYBOARD_Y + 30, KEYBOARD_W - 115, 18, TFT_BLACK);
+  tft.drawRect(KEYBOARD_X + KEY_W * 2 + KEY_GAP*2 + 5, KEYBOARD_Y + 28, KEYBOARD_W - (KEYBOARD_X + KEY_W * 2 + KEY_GAP*2) - KEY_W * 2 - KEY_GAP*2 - 3 - 10 + 6, 22, TFT_GREEN);
+  tft.fillRect(KEYBOARD_X + KEY_W * 2 + KEY_GAP*2 + 5 + 3, KEYBOARD_Y + 30, KEYBOARD_W - (KEYBOARD_X + KEY_W * 2 + KEY_GAP*2) - KEY_W * 2 - KEY_GAP*2 - 3 - 10, 18, TFT_BLACK);
   tft.setTextColor(TFT_GREEN);
   tft.setTextDatum(TL_DATUM);
   tft.setTextSize(1);
-  tft.drawString(inputBuffer, KEYBOARD_X + 60, KEYBOARD_Y + 39);
+  tft.drawString(inputBuffer, KEYBOARD_X + KEY_W * 2 + KEY_GAP*2 + 5 + 3, KEYBOARD_Y + 39);
 }
 
 void uiDrawKeyboard() {
