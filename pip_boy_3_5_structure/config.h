@@ -69,7 +69,7 @@
 
 // ======================= WiFi / NTP =======================
 #define NTP_SERVER "pool.ntp.org"
-#define NTP_SYNC_INTERVAL 3600      // секунд
+#define NTP_SYNC_INTERVAL 36000      // секунд
 #define WIFI_TIMEOUT 10000            // мс
 
 // ======================= WEATHER =======================

@@ -20,11 +20,15 @@ void rtcSaveToModule();             // Сохранить system time в RTC
 bool rtcIsFound();
 time_t rtcGetNtpTime();               // Получить время с NTP
 void rtcSyncNtpIfNeeded();            // Синхронизация с NTP при необходимости
+void syncTimeFromGPS();                // Синхронизация по GPS
 
 // Глобальные переменные
 extern RTC_DS1307 rtc;
 extern bool rtcFound;
 extern bool ntpSynced;
 extern time_t lastNtpSync;
-
+extern bool gpsTimeSynced;
+extern bool needUpdateTimeScreen;
+extern int currentScreen;
+extern lastScreen
 #endif

@@ -2,11 +2,17 @@
 #include "config.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <GPSModule.h>
 
 RTC_DS1307 rtc;
 bool rtcFound = false;
 bool ntpSynced = false;
 time_t lastNtpSync = 0;
+bool gpsTimeSynced = false;
+unsigned long lastGpsTimeSync = 0;
+
+//class GPSModule;
+extern GPSModule gps;
 
 // Часовой пояс (настрой под себя)
 TimeChangeRule myStandardTime = {"GMT", First, Sun, Nov, 2, 0};
@@ -85,6 +91,53 @@ void rtcSaveToModule() {
   rtc.adjust(DateTime(year(utc), month(utc), day(utc), 
                      hour(utc), minute(utc), second(utc)));
 }
+
+
+void syncTimeFromGPS() {
+    // Не чаще раза в минуту (GPS время не дрифтует, нет смысла чаще)
+    if ((millis() - lastGpsTimeSync < 60000) || gpsTimeSynced) return;
+    
+    // GPS должен отдавать хотя бы время (холодный старт тоже подходит)
+    if (!gps.hasTime()) return;
+    if (DEBUGFLAG) Serial.println("[RTC] parce time GPS");
+    uint8_t h, m, s, d, mo, y;
+    gps.getTime(h, m, s);
+    gps.getDate(d, mo, y);
+    
+    // Если RMC ещё не пришёл — дата будет 0.0.0, ждём.
+    if (y == 0 && d == 0 && mo == 0) return;
+    
+    int fullYear = y + 2000;  // NMEA: 26 → 2026
+    
+    // Защита от мусора
+    if (fullYear < 2024 || fullYear > 2035) return;
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return;
+    if (h > 23 || m > 59 || s > 59) return;
+    
+    // Собираем UTC time_t через RTClib DateTime
+    DateTime gpsDt(fullYear, mo, d, h, m, s);
+    time_t gpsUtc = gpsDt.unixtime();
+    
+    // Устанавливаем системное время (Time.h хранит UTC)
+    setTime(gpsUtc);
+    
+    // Сразу пишем в RTC, чтобы время сохранилось при перезагрузке
+    if (rtcFound) {
+        rtc.adjust(gpsDt);
+        rtcSaveToModule();
+    }
+    if (currentScreen == 1)
+    {
+      lastScreen = -1;
+      needUpdateTimeScreen = true;
+    }
+    gpsTimeSynced = true;
+    lastGpsTimeSync = millis();
+    
+    if (DEBUGFLAG) Serial.printf("[RTC] GPS Время скорректировано: %02d.%02d.%04d %02d:%02d:%02d UTC\n",
+                  d, mo, fullYear, h, m, s);
+}
+
 
 void sendNTPpacket(IPAddress &address) {
   memset(packetBuffer, 0, NTP_PACKET_SIZE);

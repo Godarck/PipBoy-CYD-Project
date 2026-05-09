@@ -195,7 +195,7 @@ int clockDatum = TL_DATUM;
 uint16_t clockBackgroundColor = TFT_BLACK;
 uint16_t clockFontColor = TFT_GREEN; // Зелёный для Pip-Boy стиля!
 int timeY = SCREEN_CONTENT_H / 3; // Позиция часов на экране
-
+bool needUpdateTimeScreen = false;
 int prevDay = 0;
 
 // переменные таймеров
@@ -367,6 +367,7 @@ void fillLinesSprite();
 void DrawDigitsOneByOne();
 void ParseDigits(time_t utc);
 void DrawDate(time_t utc);
+void syncTimeFromGPS();
 
 // погода
 bool isDayTime();
@@ -589,8 +590,10 @@ void loop() {
     {
         String srcg = "[GPS] Satt: 000 On: 0";
         if (gps.hasFix()) {
+                syncTimeFromGPS();
                 srcg = "[GPS] Active D: " + String(gps.getTimeString()) ;
         } else if (gps.hasTime()) {
+                syncTimeFromGPS();
                 srcg = "[GPS] Time: " + String(gps.getTimeString()) ;
         }
         // Вариант 3: Полная тишина
@@ -606,7 +609,7 @@ void loop() {
           // Закрасить старое значение
           String src = "[GPS] Active D: 00.00.00";
           int tws = tft.textWidth(src); 
-          src = "[GPS] Satt: " + String(gps.getSats()) + " On: " + String(gps.hasFix());
+          src = "[GPS] Satt: " + String(gps.getSats()) + " T: " + String(gpsTimeSynced);//String(gps.hasFix());
           tft.fillRect(5, SCREEN_BOTTOM_Y - 30 - TAB_H, tws, 22, TFT_NAVY);
           tft.setCursor(5, SCREEN_BOTTOM_Y - 30 - TAB_H);
           tft.println(srcg);
@@ -717,6 +720,11 @@ void loop() {
   
   // Анимация часов
   if (currentScreen == 1 && clockInitialized && timeStatus() != timeNotSet) {
+    if (needUpdateTimeScreen)
+    {
+      drawPipBoyScreen1();
+      needUpdateTimeScreen = false;
+    }
     time_t current = now();
     if (current != prevDisplay) {
       digitalWrite(LED_R, LOW);
@@ -728,6 +736,7 @@ void loop() {
       DrawDate(prevDisplay);
       //DrawColons();
       DrawAmPm();
+      TimeSourceUpdate();
     }
     delay(100);
   }
@@ -1643,6 +1652,26 @@ void DrawAmPm() {
   }
 }
 
+void TimeSourceUpdate()
+{
+  // Индикатор источника
+  if (rtcFound || ntpSynced || gpsTimeSynced)
+  {
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(tft.color565(0, 100, 0));
+    // Закрасить старое значение
+
+    String src = (ntpSynced) ? "[NTP]" : 
+                (gpsTimeSynced) ? "[GPS]" : "[RTC]";
+    int tws = tft.textWidth(src);     
+    int th = tft.fontHeight();        
+    tft.fillRect(TFT_WIDTH_SCREEN - tws - 5, 10, tws + 5, th, TFT_BLACK); 
+    drawScanlinesButtons(TFT_WIDTH_SCREEN - tws - 5, 10, th+2, tws + 5);
+    tft.drawString(src, TFT_WIDTH_SCREEN - tws - 5, 10);
+  }
+}
+
 void DrawDigitsAtOnce() {
   //tft.setTextDatum(TL_DATUM);
   for (size_t f = 0; f <= digs[0]->Height(); f++) // For all animation frames...
@@ -2180,8 +2209,8 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
     tft.fillRect(SCREEN_CENTER - 60, SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 + BUTTON_H + 10 , 120, BUTTON_H, TFT_GREEN);
     delay(30);
     digitalWrite(LED_B, HIGH);
-    weatherLat = gps.getLat();
-    weatherLon = gps.getLng();
+    weatherLat = String(gps.getLat(), 6);
+    weatherLon = String(gps.getLng(), 6);
     clickBuzzer();
     drawWeatherSettings();
     return;
