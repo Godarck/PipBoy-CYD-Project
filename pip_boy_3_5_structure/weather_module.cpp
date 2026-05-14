@@ -187,7 +187,7 @@ static int fetchWttr() {
   
   if (code == 200) {
     String payload = http.getString();
-    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", String(payload));
+    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", payload.c_str());
     
     int sep1 = payload.indexOf('|');
     int sep2 = payload.indexOf('|', sep1 + 1);
@@ -262,7 +262,7 @@ static int fetchOpenMeteo() {
   
   if (code == 200) {
     String payload = http.getString();
-    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", String(payload));
+    if (DEBUGFLAG) Serial.printf("[WEATHER] Parce from: %s", payload.c_str());
 
     StaticJsonDocument<512> doc;
     if (!deserializeJson(doc, payload)) {

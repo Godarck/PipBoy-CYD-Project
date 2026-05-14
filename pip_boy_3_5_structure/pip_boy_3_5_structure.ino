@@ -25,6 +25,8 @@ ARDUINO IDE PREFERENCES:
   TFT_eSPI by Boodmer                   ver 2.5.43
   Adafruit BusIO by Adafruit            ver 1.17.4  
   Adafruit BMP280 Library by Adafruit   ver 3.0.0
+  Adafruit BME280 Library by Adafruit   ver 2.3.0
+  PNGDec by Larry Bank                  ver 1.1.6
 
 Libraries : 
   Используем библиотеку Wire версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/Wire 
@@ -119,6 +121,7 @@ AP - зависит от времени суток (с 8 утра до 13:00 у�
 #include "BMP280Module.h"
 #include "pulse_sensor.h"
 #include "GPSModule.h"
+#include "maps.h"
 
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -220,6 +223,8 @@ bool psActive = false;
 GPSModule gps(Serial2, /*rx=*/ GPS_ONRX_PIN, /*tx=*/GPS_ONTX_PIN, /*baud=*/9600);
 bool GPS_Connected = false;
 
+MapsModule* pipMaps = nullptr;
+
  //SPIClass SDSPI(VSPI);
 
 setup_t user;
@@ -281,11 +286,12 @@ void initStartUp();
 void drawWindArrow();
 void drawScanlines();
 void drawScanlinesButtons(int16_t xS, int16_t yS, int16_t hS, int16_t wS);
-void drawPipBoyScreen();
-void drawPipBoyScreen1();
-void drawPipBoyScreen2();
-void drawPipBoyScreen3();
-void drawPipBoyScreen4();
+void drawPipBoyScreen(); // stats
+void drawPipBoyScreen1(); //clock
+void drawPipBoyScreen2(); // radio
+void drawPipBoyScreen3(); //weather
+void drawPipBoyScreen4(); // GEneral setup
+void drawPipBoyScreen5(); // GPS
 void drawButtonsScreen4();
 void drawRadioSetButtons();
 void updateHPAP();
@@ -321,7 +327,8 @@ void drawWiFiScreen();
 void scanWiFiNetworks();
 void connectToWiFi(const char* ssid, const char* password);
 
-
+// GPS
+void UpdateMapInfoPanel();
 // Клавиатура
 void initKeyboard();
 void drawKeyboard();
@@ -442,13 +449,13 @@ void setup() {
   SDSPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS); // SDSPI.begin(SCLK, MISO, MOSI);
   //SDSPI.setFrequency(80000000);
   //SD.begin(5, SDSPI);
-  if (SD.begin(SD_CS, SDSPI, 1000000)) {                // CS = IO5 (по твоей схеме)
-    sdCardInitialized = true;
-    if (DEBUGFLAG) Serial.println("SD Card Initialized 1MHz");
-  } else if (SD.begin(SD_CS, SDSPI, 2000000))
-  {                
+  if (SD.begin(SD_CS, SDSPI, 2000000)) {                // CS = IO5 (по твоей схеме)
     sdCardInitialized = true;
     if (DEBUGFLAG) Serial.println("SD Card Initialized 2MHz");
+  } else if (SD.begin(SD_CS, SDSPI, 1000000))
+  {                
+    sdCardInitialized = true;
+    if (DEBUGFLAG) Serial.println("SD Card Initialized 1MHz");
   }
   else {
     sdCardInitialized = false;
@@ -588,6 +595,8 @@ void loop() {
 
     if (GPS_Connected == true)
     {
+      if (currentScreen == 4)
+        UpdateMapInfoPanel();
         String srcg = "[GPS] Satt: 000 On: 0";
         if (gps.hasFix()) {
                 syncTimeFromGPS();
@@ -924,15 +933,16 @@ void ShowTFTUserSetup()
   if (user.tft_driver != 0xE9D) // For ePaper displays the size is defined in the sketch
 {
   Serial.print("Display driver = "); Serial.println(user.tft_driver, HEX); // Hexadecimal code
-  Serial.print("Display width  = "); Serial.println(user.tft_width);  // Rotation 0 width and height
-  Serial.print("Display height = "); Serial.println(user.tft_height);
-  Serial.println();
+  if (user.tft_width == TFT_HEIGHT_SCREEN) {   Serial.print("TFT_WIDTH   OK = "); Serial.print(user.tft_width); } else {                Serial.printf("\nTFT_WIDTH   = ERROR , NEED %d | But define is = ", TFT_HEIGHT_SCREEN); Serial.print(user.tft_width);}
+  if (user.tft_height == TFT_WIDTH_SCREEN) {  Serial.print("\nTFT_HEIGHT  OK = "); Serial.print(user.tft_height); } else {               Serial.printf("\nTFT_HEIGHT  = ERROR , NEED %d | But define is = ", TFT_WIDTH_SCREEN); Serial.print(user.tft_height);}
+
+ 
 }
 else if (user.tft_driver == 0xE9D) Serial.println("Display driver = ePaper\n");
 
-if (user.tft_driver == 7796) 
-{ Serial.print("ST7796_DRIVER  OK"); } else { Serial.print("ST7796_DRIVER      ERROR! , UNCOMENT #define ST7796_DRIVER current in Setup is: "); Serial.println(user.tft_driver); }
-
+if (user.tft_driver == 30614) 
+{ Serial.print("\nST7796_DRIVER  OK"); } else { Serial.print("\nST7796_DRIVER      ERROR! , UNCOMENT #define ST7796_DRIVER // "); Serial.println(user.tft_driver); }
+ Serial.println();
 if (user.pin_tft_mosi == 13) { Serial.print("\nMOSI        OK = "); Serial.print(getPinName(user.pin_tft_mosi)); } else { Serial.print("\nMOSI        = ERROR , NEED 13  | But define is = "); Serial.print(getPinName(user.pin_tft_mosi));}
 if (user.pin_tft_miso == 12) { Serial.print("\nMISO        OK = "); Serial.print(getPinName(user.pin_tft_miso)); } else { Serial.print("\nMISO        = ERROR , NEED 12  | But define is = "); Serial.print(getPinName(user.pin_tft_miso));}
 if (user.pin_tft_clk  == 14) { Serial.print("\nSCLK        OK = "); Serial.print(getPinName(user.pin_tft_clk)); } else {  Serial.print("\nSCLK        = ERROR , NEED 14  | But define is = "); Serial.print(getPinName(user.pin_tft_clk));}
@@ -1213,6 +1223,22 @@ if (pulse.isConnected())
     tft.setTextColor(TFT_GREEN);
   }
   
+  clackBuzzer();
+  tft.println(" ");
+  delay(200);
+  tft.print("MAP module ------------------ ");
+  if (sdCardInitialized)
+  {
+    pipMaps = new MapsModule();
+    pipMaps->begin();
+    tft.println("OK");
+  }
+  else
+  {
+    tft.setTextColor(TFT_RED);
+    tft.println("ERROR");
+    tft.setTextColor(TFT_GREEN);
+  }
 
     radioStartTask();
   // Тест RGB
@@ -1450,7 +1476,8 @@ void handleTouch(uint16_t x, uint16_t y) {
           //weatherForceUpdate(); 
           drawPipBoyScreen3(); 
           break;
-        case 4: drawPipBoyScreen4(); break;
+        case 4: drawPipBoyScreen5(); break;
+        case 5: drawPipBoyScreen4(); break;
       }
       
       drawTabButtons();
@@ -1470,7 +1497,7 @@ void handleTouch(uint16_t x, uint16_t y) {
   else if (currentScreen == 2) {
       handleRadioSetButtons(x, y);
   }
-  else if (currentScreen == 4) {
+  else if (currentScreen == TAB_COUNT - 1) {
         HandleButtonsScreen4(x, y);
   if (weatherSettingsActive) {
         handleWeatherSettingsTouch(x, y);
@@ -2717,12 +2744,160 @@ void drawRadioSetButtons() {
     }
 }
 
+
+// ========== Экран карты ==========
+void drawPipBoyScreen5()
+{
+    // --- Основная отрисовка ---
+    tft.fillScreen(TFT_BLACK);
+    
+    // Заголовок экрана — Top-Center
+    tft.setTextDatum(TC_DATUM);
+    tft.setTextColor(TFT_GREEN);
+    tft.setTextSize(2);
+    tft.drawString("WORLD MAP", TFT_WIDTH_SCREEN / 2, 8);
+
+    float lat = atof(weatherLat.c_str());
+    float lon = atof(weatherLon.c_str());
+    bool gpsActive = false;
+    
+    if (GPS_Connected && gps.hasFix()) {
+        lat = gps.getLat();
+        lon = gps.getLng();
+        gpsActive = true;
+    }
+    
+    uint8_t have = pipMaps->cachedCount(lat, lon, 16);
+    
+    // --- Экран загрузки ---
+    if (have < 9 && WiFi.status() == WL_CONNECTED) {
+        tft.fillScreen(TFT_BLACK);
+        
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_GREEN);
+        tft.setTextSize(2);
+        tft.drawString("SYNCING MAP DATA...",  TFT_WIDTH_SCREEN / 2, SCREEN_HEADER_Y + SCREEN_CONTENT_H/2 - 20);
+        
+        // Рамка прогресс-бара
+        uint16_t pbW = ( TFT_WIDTH_SCREEN / 2);
+        uint16_t pbH = 20;
+        uint16_t pbX = ( TFT_WIDTH_SCREEN / 2) - pbW/2;
+        uint16_t pbY = SCREEN_HEADER_Y + SCREEN_CONTENT_H/2 + 10;
+        tft.drawRect(pbX, pbY, pbW, pbH, TFT_GREEN);
+        
+       // pipMaps->ensureTiles(lat, lon, 16);
+        pipMaps->ensureTiles(lat ,lon ,16 , [&](uint8_t p) {
+            tft.fillRect(pbX + 2, pbY + 2, (p * (pbW - 4)) / 100, pbH - 4, TFT_GREEN);
+        });
+        /*while (pipMaps->isLoading()) {
+            uint8_t p = pipMaps->getProgress();
+            tft.fillRect(pbX + 2, pbY + 2, (p * (pbW - 4)) / 100, pbH - 4, TFT_GREEN);
+            delay(50);
+        }*/
+        delay(200);
+    }
+    
+
+    
+    // Карта в области контента
+    uint16_t mapY = SCREEN_HEADER_Y + 2;
+    pipMaps->drawMap(lat, lon, 5, mapY);
+    
+        // Заголовок экрана — Top-Center
+    tft.setTextDatum(TC_DATUM);
+    tft.setTextColor(TFT_GREEN);
+    tft.setTextSize(2);
+    tft.drawString("WORLD MAP", TFT_WIDTH_SCREEN / 2, 8);
+
+    // GPS статус — Bottom-Left над табами
+    tft.setTextDatum(BL_DATUM);
+    tft.setTextSize(1);
+    if (gpsActive) {
+        tft.setTextColor(TFT_GREEN);
+        tft.drawString("GPS: LIVE | SATS:" + String(gps.getSats()), 10, TAB_Y - 10);
+    } else {
+        tft.setTextColor(TFT_DARKGREEN);
+        tft.drawString("GPS: OFFLINE", 10, TAB_Y - 10);
+    }
+
+      UpdateMapInfoPanel();
+        
+        //return;
+    
+    
+  drawTabButtons();
+ 
+  lastScreen = currentScreen;
+
+}
+
+void UpdateMapInfoPanel()
+{
+    float lat = atof(weatherLat.c_str());
+    float lon = atof(weatherLon.c_str());
+    bool gpsActive = false;
+    
+    if (GPS_Connected && gps.hasFix()) {
+        lat = gps.getLat();
+        lon = gps.getLng();
+        gpsActive = true;
+        
+    }
+        uint8_t have = pipMaps->cachedCount(lat, lon, 16);
+        tft.setTextSize(1);
+        tft.fillRect(5 , 0, 80, 32, TFT_BLACK);
+        tft.drawRect(5,  0, 80, 32, TFT_GREEN);
+        
+        tft.setTextDatum(TL_DATUM);
+        if (have < 3)
+        {
+            tft.setTextColor(TFT_BROWN);
+            tft.drawString("Area cashed: NO", 9,  2);
+        }else
+        {
+            tft.setTextColor(tft.color565(0, 180, 0));
+            String str = "Area cashed: " + String(have);
+            tft.drawString(str, 9,  2);
+        }
+
+        if (gpsActive) 
+          tft.setTextColor(TFT_GREEN);
+        else
+          tft.setTextColor(TFT_YELLOW);
+          String gpscoords = String(lat, 4) + " " + String(lon, 4);
+          tft.drawString(gpscoords, 9,  12);
+        
+
+        if (WiFi.status() != WL_CONNECTED)
+        {
+          tft.setTextColor(TFT_GREEN);
+          tft.drawString("WiFi OFF", 9,  22);
+        }
+}
+
 void drawTabButtons() {
   drawStatusButton(currentScreen == 0);
   drawSpecialButton(currentScreen == 1);
   drawSkillsButton(currentScreen == 2);
   drawWeatherButton(currentScreen == 3);
-  drawGeneralButton(currentScreen == 4);
+  drawMapButton(currentScreen == 4);
+  drawGeneralButton(currentScreen == 5);
+}
+
+void drawMapButton(bool active) {
+  int x =  4 * TAB_W;;
+  if (active) {
+    tft.fillRect(x, TAB_Y, TAB_W, TAB_H, TFT_GREEN);
+    tft.setTextColor(TFT_BLACK);
+  } else {
+    tft.fillRect(x, TAB_Y, TAB_W, TAB_H, TFT_BLACK);
+    drawScanlinesButtons(x, TAB_Y, TAB_H, TAB_W);
+    tft.drawRect(x, TAB_Y, TAB_W, TAB_H, TFT_GREEN);
+    tft.setTextColor(TFT_GREEN);
+  }
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextSize(TAB_TEXT_SIZE);
+  tft.drawString("MAP", x + TAB_W/2, TAB_Y + TAB_H/2);
 }
 
 void drawStatusButton(bool active) {
@@ -2788,7 +2963,7 @@ void drawWeatherButton(bool active) {
 }
 
 void drawGeneralButton(bool active) {
-  int x = 4 * TAB_W;
+  int x = 5 * TAB_W;
   if (active) {
     tft.fillRect(x, TAB_Y, TAB_W, TAB_H, TFT_GREEN);
     tft.setTextColor(TFT_BLACK);

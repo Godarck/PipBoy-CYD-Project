@@ -66,6 +66,7 @@
 // ======================= GPS GY-NE06MV2 ======================= 
 #define GPS_ONTX_PIN 32
 #define GPS_ONRX_PIN 35
+#define CHANGE_PIP_COLOR 0
 
 // ======================= WiFi / NTP =======================
 #define NTP_SERVER "pool.ntp.org"
@@ -95,11 +96,12 @@
 #define DEFAULT_LON "37.6173"
 
 // ======================= UI ========================
+#define TAB_COUNT 6
 #define TAB_H 40
 #define TAB_Y (TFT_HEIGHT_SCREEN - TAB_H - 2)
-#define TAB_W (TFT_WIDTH_SCREEN/5)
+#define TAB_W (TFT_WIDTH_SCREEN/TAB_COUNT)
 
-#define TAB_TEXT_SIZE 2
+#define TAB_TEXT_SIZE 1
 #define LVL_TEXT_SIZE 3
 #define TIMERS_TEXT_SIZE 1
 #define LEFTPANEL_TEXT_SIZE 1

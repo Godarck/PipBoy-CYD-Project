@@ -94,18 +94,30 @@ void rtcSaveToModule() {
 
 
 void syncTimeFromGPS() {
+    static unsigned long lastMessage = 0;
     // Не чаще раза в минуту (GPS время не дрифтует, нет смысла чаще)
     if ((millis() - lastGpsTimeSync < 60000) || gpsTimeSynced) return;
     
     // GPS должен отдавать хотя бы время (холодный старт тоже подходит)
     if (!gps.hasTime()) return;
-    if (DEBUGFLAG) Serial.println("[RTC] parce time GPS");
     uint8_t h, m, s, d, mo, y;
     gps.getTime(h, m, s);
     gps.getDate(d, mo, y);
     
     // Если RMC ещё не пришёл — дата будет 0.0.0, ждём.
-    if (y == 0 && d == 0 && mo == 0) return;
+    if (y == 0 && d == 0 && mo == 0) 
+    {
+
+      if (DEBUGFLAG) 
+      {
+        if ((millis() - lastMessage < 10000))
+        {
+          lastMessage = millis();
+          Serial.println("[RTC] Waiting date from GPS...");
+        }
+      }
+      return;
+    }
     
     int fullYear = y + 2000;  // NMEA: 26 → 2026
     
