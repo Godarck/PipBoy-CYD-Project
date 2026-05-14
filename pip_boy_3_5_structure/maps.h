@@ -14,7 +14,7 @@ public:
     MapsModule();
     bool begin();
     bool ensureTiles(float lat, float lon, uint8_t zoom = 16, std::function<void(uint8_t)> progressCallback = nullptr);
-    void drawMap(float lat, float lon, uint16_t areaX = 5, uint16_t areaY = SCREEN_HEADER_Y + 2);
+    void drawMap(float lat, float lon);
     uint8_t cachedCount(float lat, float lon, uint8_t zoom = 16);
     uint8_t getProgress() const { return _progress; }
     bool isLoading() const { return _loading; }

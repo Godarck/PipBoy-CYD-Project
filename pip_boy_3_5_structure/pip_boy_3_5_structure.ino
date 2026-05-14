@@ -613,17 +613,17 @@ void loop() {
         if (DEBUGFLAG && GPS_Connected) 
         {
           tft.setTextSize(1);
-          tft.setTextDatum(TR_DATUM);
+          tft.setTextDatum(TL_DATUM);
           tft.setTextColor(TFT_GREEN);
           // Закрасить старое значение
           String src = "[GPS] Active D: 00.00.00";
           int tws = tft.textWidth(src); 
           src = "[GPS] Satt: " + String(gps.getSats()) + " T: " + String(gpsTimeSynced);//String(gps.hasFix());
-          tft.fillRect(5, SCREEN_BOTTOM_Y - 30 - TAB_H, tws, 22, TFT_NAVY);
-          tft.setCursor(5, SCREEN_BOTTOM_Y - 30 - TAB_H);
-          tft.println(srcg);
-          tft.setCursor(5, SCREEN_BOTTOM_Y - 15 - TAB_H);
-          tft.println(src);
+          tft.fillRect(7, SCREEN_BOTTOM_Y - 30 - TAB_H, tws, 22, TFT_NAVY);
+         // tft.setCursor(7, SCREEN_BOTTOM_Y - 29 - TAB_H);
+          tft.drawString(srcg, 7, SCREEN_BOTTOM_Y - 30 - TAB_H );
+          //tft.setCursor(7, SCREEN_BOTTOM_Y - 15 - TAB_H);
+          tft.drawString(srcc, 7, SCREEN_BOTTOM_Y - 16 - TAB_H );
         }
     }
   }
@@ -632,6 +632,16 @@ void loop() {
   static unsigned long lastTimeUpdate = 0;
   if (millis() - lastTimeUpdate > 60000) {
     lastTimeUpdate = millis();
+    if (currentScreen == 4)
+    {
+      if (GPS_Connected == true && gps.hasFix())
+      {
+        float lat = gps.getLat();
+        float lon = gps.getLng();
+        pipMaps->drawMap(lat, lon);
+      }
+    }
+
     if (!weatherHasData() ) 
     {
       weatherUpdate();
@@ -2799,9 +2809,7 @@ void drawPipBoyScreen5()
     
 
     
-    // Карта в области контента
-    uint16_t mapY = SCREEN_HEADER_Y + 2;
-    pipMaps->drawMap(lat, lon, 5, mapY);
+    pipMaps->drawMap(lat, lon);
     
         // Заголовок экрана — Top-Center
     tft.setTextDatum(TC_DATUM);
@@ -2845,8 +2853,8 @@ void UpdateMapInfoPanel()
     }
         uint8_t have = pipMaps->cachedCount(lat, lon, 16);
         tft.setTextSize(1);
-        tft.fillRect(5 , 0, 80, 32, TFT_BLACK);
-        tft.drawRect(5,  0, 80, 32, TFT_GREEN);
+        tft.fillRect(5 , 0, 90, 32, TFT_BLACK);
+        tft.drawRect(5,  0, 90, 32, TFT_GREEN);
         
         tft.setTextDatum(TL_DATUM);
         if (have < 3)

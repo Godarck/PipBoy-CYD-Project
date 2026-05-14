@@ -67,6 +67,10 @@
 #define GPS_ONTX_PIN 32
 #define GPS_ONRX_PIN 35
 #define CHANGE_PIP_COLOR 0
+#define MAP_START_X 5
+#define MAP_START_Y 32
+#define MAP_END_X (TFT_WIDTH_SCREEN - (MAP_START_X *2))
+#define MAP_END_Y TAB_Y - 5
 
 // ======================= WiFi / NTP =======================
 #define NTP_SERVER "pool.ntp.org"

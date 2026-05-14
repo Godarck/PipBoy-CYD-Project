@@ -5,10 +5,12 @@ extern TFT_eSPI tft;
 
 static PNG _png;
 static File _pngFile;
-static int16_t _drawSx = 5;
+static int16_t _drawSx = 0;
 static int16_t _drawSy = 0;
-static int16_t _clipTop = 40;
-static int16_t _clipBottom = 320;
+static int16_t _clipLeft = 86;
+static int16_t _clipRight = 475;
+static int16_t _clipTop = 42;
+static int16_t _clipBottom = 270;
 static uint16_t _lineBuf[257];
 
 static int PNGDrawCallback(PNGDRAW* pDraw) {
@@ -26,9 +28,8 @@ static int PNGDrawCallback(PNGDRAW* pDraw) {
         uint8_t b = (c & 0x1F) << 3;
 
         uint8_t lum = (r * 30 + g * 59 + b * 11) / 100;
-        // Монохромный зелёный: яркость = насыщенность зелёного
         uint8_t gg = min(255, (lum * 140) / 100);
-        uint8_t dg = lum >> 3; // тёмный оттенок для теней
+        uint8_t dg = lum >> 3;
         r = dg;
         g = dg;
         b = gg;
@@ -37,18 +38,24 @@ static int PNGDrawCallback(PNGDRAW* pDraw) {
     }
 #endif
 
-
-
-
     int16_t drawY = _drawSy + pDraw->y;
-    if (drawY < 0 || drawY >= TFT_HEIGHT_SCREEN - TAB_H - 5) return 1;
     if (drawY < _clipTop || drawY >= _clipBottom) return 1;
 
     int16_t sx = _drawSx;
     int16_t drawW = w;
     int16_t srcOffset = 0;
-    if (sx < _drawSx) { srcOffset = -sx; drawW += sx; sx = _drawSx; }
-    if (sx + drawW > TFT_WIDTH_SCREEN - 10) drawW = TFT_WIDTH_SCREEN - 5 - sx;
+
+    // Clip left
+    if (sx < _clipLeft) {
+        srcOffset = _clipLeft - sx;
+        drawW -= (_clipLeft - sx);
+        sx = _clipLeft;
+    }
+    // Clip right
+    if (sx + drawW > _clipRight) {
+        drawW = _clipRight - sx;
+    }
+
     if (drawW > 0) {
         tft.pushImage(sx, drawY, drawW, 1, _lineBuf + srcOffset);
         tft.dmaWait();
@@ -229,8 +236,9 @@ void MapsModule::drawPngTile(uint16_t x, uint16_t y, uint8_t z, int16_t sx, int1
         return;
     }
 
-    if (sx + TILE_SIZE <= 0 || sx >= TFT_WIDTH_SCREEN || 
-        sy + TILE_SIZE <= 0 || sy >= TFT_HEIGHT_SCREEN) {
+    // Offscreen culling against MAP bounds (not full screen)
+    if (sx + TILE_SIZE <= _clipLeft || sx >= _clipRight || 
+        sy + TILE_SIZE <= _clipTop || sy >= _clipBottom) {
         if (DEBUGFLAG) Serial.printf("[MAPS] {drawPngTile} SKIP: %s (offscreen)\n", p.c_str());
         return;
     }
@@ -254,14 +262,30 @@ void MapsModule::drawPngTile(uint16_t x, uint16_t y, uint8_t z, int16_t sx, int1
 }
 
 void MapsModule::drawPlaceholder(int16_t sx, int16_t sy) {
-    tft.fillRect(sx, sy, TILE_SIZE, TILE_SIZE, TFT_BLACK);
-    tft.drawRect(sx, sy, TILE_SIZE, TILE_SIZE, TFT_DARKGREEN);
-    tft.drawLine(sx, sy, sx + TILE_SIZE, sy + TILE_SIZE, TFT_DARKGREEN);
-    tft.drawLine(sx + TILE_SIZE, sy, sx, sy + TILE_SIZE, TFT_DARKGREEN);
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_DARKGREEN);
-    tft.setTextSize(1);
-    tft.drawString("NO DATA", sx + TILE_SIZE / 2, sy + TILE_SIZE / 2);
+    // Clip placeholder to map bounds so it never draws outside the green frame
+    int16_t x0 = max(sx, (int16_t)_clipLeft);
+    int16_t y0 = max(sy, (int16_t)_clipTop);
+    int16_t x1 = min((int32_t)sx + TILE_SIZE, (int32_t)_clipRight);
+    int16_t y1 = min((int32_t)sy + TILE_SIZE, (int32_t)_clipBottom);
+    
+    if (x1 <= x0 || y1 <= y0) return; // fully outside
+    
+    int16_t w = x1 - x0;
+    int16_t h = y1 - y0;
+    
+    tft.fillRect(x0, y0, w, h, TFT_BLACK);
+    tft.drawRect(x0, y0, w, h, TFT_DARKGREEN);
+    tft.drawLine(x0, y0, x1, y1, TFT_DARKGREEN);
+    tft.drawLine(x1, y0, x0, y1, TFT_DARKGREEN);
+    
+    // Draw text only if tile is fully inside map area
+    if (sx >= _clipLeft && sx + TILE_SIZE <= _clipRight && 
+        sy >= _clipTop && sy + TILE_SIZE <= _clipBottom) {
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_DARKGREEN);
+        tft.setTextSize(1);
+        tft.drawString("NO DATA", sx + TILE_SIZE / 2, sy + TILE_SIZE / 2);
+    }
 }
 
 void MapsModule::drawMarker(int16_t mx, int16_t my) {
@@ -270,31 +294,47 @@ void MapsModule::drawMarker(int16_t mx, int16_t my) {
     tft.fillCircle(mx, my + 1, 2, TFT_WHITE);
 }
 
-void MapsModule::drawMap(float lat, float lon, uint16_t areaX, uint16_t areaY) {
+void MapsModule::drawMap(float lat, float lon) {
+    // Use global bounds from config.h — left menu is now fully protected
+    uint16_t startX = MAP_START_X;
+    uint16_t startY = MAP_START_Y;
+    uint16_t endX   = MAP_END_X;
+    uint16_t endY   = MAP_END_Y;
+    
+    uint16_t areaW = endX - startX;
+    uint16_t areaH = endY - startY;
+
     uint16_t cx, cy;
     latLonToTile(lat, lon, _zoom, cx, cy);
 
     int16_t px, py;
     latLonToPixel(lat, lon, cx, cy, _zoom, px, py);
 
-    uint16_t areaW = TFT_WIDTH_SCREEN - areaX * 2;
-    uint16_t areaH = SCREEN_BOTTOM_Y - areaY - 5;
+    // Update clipping bounds for PNG callback
+    _clipLeft   = startX;
+    _clipRight  = endX;
+    _clipTop    = startY;
+    _clipBottom = endY;
 
-    _clipTop = areaY;
-    _clipBottom = SCREEN_BOTTOM_Y - 5;
+    int16_t shiftX = startX + areaW / 2 - px;
+    int16_t shiftY = startY + areaH / 2 - py;
 
-    int16_t shiftX = areaX + areaW / 2 - px;
-    int16_t shiftY = areaY + areaH / 2 - py;
+    if (DEBUGFLAG) Serial.printf("[MAPS] {drawMap} center tile %d/%d, shift %d,%d, bounds [%d,%d]-[%d,%d]\n", 
+                                 cx, cy, shiftX, shiftY, startX, startY, endX, endY);
 
-    if (DEBUGFLAG) Serial.printf("[MAPS] {drawMap} center tile %d/%d, shift %d,%d\n", cx, cy, shiftX, shiftY);
+    // === KEY FIX: erase entire map area before drawing ===
+    // This removes old marker traces and black placeholders from previous frames
+    tft.fillRect(startX, startY, areaW, areaH, TFT_BLACK);
 
+    // Draw 3x3 tile grid
     for (int dy = -1; dy <= 1; dy++) {
         for (int dx = -1; dx <= 1; dx++) {
             int16_t sx = shiftX + dx * TILE_SIZE;
             int16_t sy = shiftY + dy * TILE_SIZE;
 
-            if (sx + TILE_SIZE <= areaX || sx >= TFT_WIDTH_SCREEN - areaX*2 ||
-                sy + TILE_SIZE <= areaY || sy >= TFT_HEIGHT_SCREEN - SCREEN_BOTTOM_Y) {
+            // Cull tiles that are completely outside the map bounds
+            if (sx + TILE_SIZE <= startX || sx >= endX ||
+                sy + TILE_SIZE <= startY || sy >= endY) {
                 continue;
             }
 
@@ -302,9 +342,11 @@ void MapsModule::drawMap(float lat, float lon, uint16_t areaX, uint16_t areaY) {
         }
     }
 
-    int16_t mx = areaX + areaW / 2;
-    int16_t my = areaY + areaH / 2;
+    // Draw GPS marker exactly in the center of the map area
+    int16_t mx = startX + areaW / 2;
+    int16_t my = startY + areaH / 2;
     drawMarker(mx, my);
 
-    tft.drawRect(areaX, areaY, areaW, areaH, TFT_GREEN);
+    // Green border around the map area
+    tft.drawRect(startX, startY, areaW, areaH, TFT_GREEN);
 }
