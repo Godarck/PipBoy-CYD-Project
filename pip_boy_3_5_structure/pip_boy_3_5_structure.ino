@@ -623,7 +623,7 @@ void loop() {
          // tft.setCursor(7, SCREEN_BOTTOM_Y - 29 - TAB_H);
           tft.drawString(srcg, 7, SCREEN_BOTTOM_Y - 30 - TAB_H );
           //tft.setCursor(7, SCREEN_BOTTOM_Y - 15 - TAB_H);
-          tft.drawString(srcc, 7, SCREEN_BOTTOM_Y - 16 - TAB_H );
+          tft.drawString(src, 7, SCREEN_BOTTOM_Y - 16 - TAB_H );
         }
     }
   }
