@@ -13,20 +13,29 @@ class MapsModule {
 public:
     MapsModule();
     bool begin();
-    bool ensureTiles(float lat, float lon, uint8_t zoom = 16, std::function<void(uint8_t)> progressCallback = nullptr);
+    bool initSprite();                         // <-- создать спрайт (вызвать 1 раз)
+    bool ensureTiles(float lat, float lon, uint8_t zoom = MAP_ZOOM_IN, std::function<void(uint8_t)> progressCallback = nullptr);
     void drawMap(float lat, float lon);
-    uint8_t cachedCount(float lat, float lon, uint8_t zoom = 16);
+    void redrawMap(float lat, float lon);      // <-- обновить только карту без мерцания
+    uint8_t cachedCount(float lat, float lon, uint8_t zoom = MAP_ZOOM_IN);
     uint8_t getProgress() const { return _progress; }
     bool isLoading() const { return _loading; }
-
+    void setZoom(uint8_t z);
+    uint8_t getZoom() const;
+    void toggleZoom();
+    void disableSprite();
+    bool ensureExtendedTiles(float lat, float lon, uint8_t zoom = MAP_ZOOM_IN, std::function<void(uint8_t)> progressCallback = nullptr);
+    
 private:
     uint8_t _progress;
     bool _loading;
+    bool _useSprite;
     uint8_t _zoom;
     static const uint16_t TILE_SIZE = 256;
     static const uint8_t GRID = 3;
     uint16_t _centerX = 0xFFFF;
     uint16_t _centerY = 0xFFFF;
+    TFT_eSprite* _sprite;                      // <-- off-screen buffer
 
     void latLonToTile(float lat, float lon, uint8_t zoom, uint16_t& x, uint16_t& y);
     void latLonToPixel(float lat, float lon, uint16_t tileX, uint16_t tileY, uint8_t zoom, int16_t& px, int16_t& py);

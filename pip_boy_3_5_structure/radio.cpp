@@ -134,7 +134,7 @@ static void startWiFi(int index)
 
     src = new AudioFileSourceICYStream(radioStations[index].url);
     ((AudioFileSourceICYStream*)src)->RegisterMetadataCB(mdCallback, NULL);
-    buff = new AudioFileSourceBuffer(src, 32768);
+    buff = new AudioFileSourceBuffer(src, 9600);
     gen  = new AudioGeneratorMP3();
 
     if (gen->begin(buff, out)) {
@@ -144,7 +144,8 @@ static void startWiFi(int index)
         //UpdateMetaData();
         if (DEBUGFLAG) Serial.printf("[RADIO] WiFi OK: %s\n", radioStations[index].name);
     } else {
-        if (DEBUGFLAG) Serial.println("[RADIO] WiFi begin FAILED");
+        if (DEBUGFLAG) Serial.println("[RADIO] RADIO begin FAILED");
+        if (DEBUGFLAG)  Serial.printf("[RADIO] Max alloc block: %d bytes\n", ESP.getMaxAllocHeap());
         cleanup();
     }
 }

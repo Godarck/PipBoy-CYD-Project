@@ -58,6 +58,8 @@
 
 // ======================= BMP280 барометр =======================
 #define BMP280_ADDRESS 0x76
+#define OFFSET_TEMP
+#define BASE_ALT
 
 // ======================= Pulse Sensor 3 pin Analog ======================= 
 #define PULSE_SENSOR_PIN    255 
@@ -66,11 +68,13 @@
 // ======================= GPS GY-NE06MV2 ======================= 
 #define GPS_ONTX_PIN 32
 #define GPS_ONRX_PIN 35
-#define CHANGE_PIP_COLOR 0
-#define MAP_START_X 5
-#define MAP_START_Y 32
-#define MAP_END_X (TFT_WIDTH_SCREEN - (MAP_START_X *2))
-#define MAP_END_Y TAB_Y - 5
+#define CHANGE_PIP_COLOR 1
+#define MAP_START_X 5 //90 // 5
+#define MAP_START_Y 35 //45 //35
+#define MAP_END_X (TFT_WIDTH_SCREEN - 55) //460
+#define MAP_END_Y TAB_Y - 20 // 245
+#define MAP_ZOOM_OUT 12
+#define MAP_ZOOM_IN 16
 
 // ======================= WiFi / NTP =======================
 #define NTP_SERVER "pool.ntp.org"

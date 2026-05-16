@@ -85,11 +85,12 @@ void drawWiFiScreen() {
   // Статус подключения
   tft.setTextColor(TFT_GREEN);
   tft.setTextSize(1);
-  if (wifiConnected) {
+  if (WiFi.status() == WL_CONNECTED)  {
     tft.setCursor(5, LIST_Y - 25);
     tft.print("STATUS: OK > ");
     tft.print(connectedSSID);
   } else {
+    wifiConnected = false;
     tft.setCursor(5, LIST_Y - 25);
     tft.print("STATUS: DISCONNECTED");
   }
@@ -282,9 +283,9 @@ void connectToWiFi(const char* ssid, const char* password) {
   
   while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < 10000) {
     delay(500);
-    tft.fillRect(TFT_WIDTH_SCREEN / 2 - 40, 130, 40, 10, TFT_BLACK);
-    tft.setCursor(TFT_WIDTH_SCREEN / 2 - 40, 130);
-    for (int i = 0; i < dots % 4; i++) tft.print(".");
+    tft.fillRect(TFT_WIDTH_SCREEN / 2 - 10, 130, 40, 10, TFT_BLACK);
+    tft.setCursor(TFT_WIDTH_SCREEN / 2 - 10, 130);
+    for (int i = 0; i < dots % 6; i++) tft.print(".");
     dots++;
   }
   

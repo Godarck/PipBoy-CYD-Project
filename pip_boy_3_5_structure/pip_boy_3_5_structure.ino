@@ -224,7 +224,9 @@ GPSModule gps(Serial2, /*rx=*/ GPS_ONRX_PIN, /*tx=*/GPS_ONTX_PIN, /*baud=*/9600)
 bool GPS_Connected = false;
 
 MapsModule* pipMaps = nullptr;
-
+float gpsLat = atof(DEFAULT_LAT);
+float gpsLon = atof(DEFAULT_LON);
+bool GPSZoomOut = false;
  //SPIClass SDSPI(VSPI);
 
 setup_t user;
@@ -278,6 +280,18 @@ void Debug(String label, uint8_t val)
 }
 
 // ======================= ПРОТОТИПЫ ФУНКЦИЙ =======================
+
+//  ============= handles on touchscreen =====================
+void handleTouch(uint16_t x, uint16_t y);
+void HandleButtonsScreen4(uint16_t x, uint16_t y);
+void handleWiFiTouch(uint16_t x, uint16_t y);
+void handleRadioSettingsTouch(uint16_t x, uint16_t y);
+void HandleTimeSettings(uint16_t x, uint16_t y);
+void handleWeatherSettingsTouch(uint16_t x, uint16_t y);
+void handleRadioSetButtons(uint16_t x, uint16_t y);
+bool handleKeyboardTouch(uint16_t x, uint16_t y);
+void handleButtonScreen5(uint16_t x, uint16_t y);
+// =========================== main functions =======================
 void initI2C();
 bool LoadBackUpFromEPPR();
 bool SaveBackUpToEPPR();
@@ -305,13 +319,8 @@ String pad2(uint8_t val);
 
 ///General Setup Screen
 
-void HandleButtonsScreen4(uint16_t x, uint16_t y);
 void drawRadioSettings();
 void drawTimeSettings();
-void handleWiFiTouch(uint16_t x, uint16_t y);
-void handleRadioSettingsTouch(uint16_t x, uint16_t y);
-void HandleTimeSettings(uint16_t x, uint16_t y);
-void handleWeatherSettingsTouch(uint16_t x, uint16_t y);
 void drawWeatherSettings();
 
 
@@ -337,7 +346,6 @@ void redrawInputField();
 void showKeyboard(const char* placeholder);
 void hideKeyboard();
 const char* getKeyboardInput();
-bool handleKeyboardTouch(uint16_t x, uint16_t y);
 void clearKeyboardInput();
 
 
@@ -386,7 +394,6 @@ void drawCurrentWeatherIconCentered(int x, int y, uint16_t color);
 void updateWeatherScreen();
 
 // radio
-void handleRadioSetButtons(uint16_t x, uint16_t y);
 bool checkSDPath(const char* path);
 void radioSetSDFolder(const String& folder);
 int  radioScanSDFolder();
@@ -628,20 +635,101 @@ void loop() {
     }
   }
 
+// Обновление карты каждые 5 сек
+  static unsigned long lastMapUpdate = 0;
+  static float gpsLat_last = atof(DEFAULT_LAT);
+  static float gpsLon_last = atof(DEFAULT_LON);
+
+  if (millis() - lastMapUpdate > 10000) {
+    lastMapUpdate = millis();
+
+    if (currentScreen == 4)
+    {
+        int16_t  pbW = ( TFT_WIDTH_SCREEN / 2);
+        uint16_t pbH = 8;
+        uint16_t pbX = ( TFT_WIDTH_SCREEN / 2) - pbW/2;
+        uint16_t pbY = MAP_START_Y - 9;
+      if (GPS_Connected == true && gps.hasFix())
+      {
+        gpsLat= gps.getLat();
+        gpsLon= gps.getLng();
+        float dLat = abs(gpsLat - gpsLat_last);
+        float dLon = abs(gpsLon - gpsLon_last);
+      
+      if (GPSZoomOut)
+        pipMaps->setZoom(MAP_ZOOM_OUT);
+      else
+      {
+          if ((dLat > 0.01f || dLon > 0.01f))
+          {
+            if (DEBUGFLAG) Serial.println("[GUI] Auto zoom out");
+            pipMaps->setZoom(MAP_ZOOM_OUT);
+          }
+          else
+          {
+            if (DEBUGFLAG) Serial.println("[GUI] Auto zoom in");
+            pipMaps->setZoom(MAP_ZOOM_IN);
+          }
+      }
+      if ((dLat > 0.001f || dLon > 0.001f && pipMaps->getZoom() == MAP_ZOOM_IN) || (dLat > 0.01f || dLon > 0.01f && pipMaps->getZoom() == MAP_ZOOM_OUT))
+      {
+      uint8_t have = pipMaps->cachedCount(gpsLat, gpsLon, pipMaps->getZoom());
+    // --- Экран загрузки ---
+    
+    if (have < 9 && WiFi.status() == WL_CONNECTED) {
+        
+        //статус подгрузки карты
+        tft.fillRect(pbX, pbY, pbW, pbH, TFT_BLACK);
+        pipMaps->ensureTiles(gpsLat,gpsLon,pipMaps->getZoom() , [&](uint8_t p) {
+            tft.fillRect(pbX + 2, pbY + 2, (p * (pbW - 4)) / 100, pbH - 4, TFT_GREEN);
+        });
+
+        tft.fillRect(pbX, pbY, pbW, pbH, TFT_BLACK);
+        //delay(20);
+        lastMapUpdate = millis();
+    }
+        //pipMaps->drawMap(gpsLat, gpsLon);
+        gpsLat_last = gpsLat;
+        gpsLon_last = gpsLon;
+
+        tft.fillRect(pbX, pbY, pbW, pbH, TFT_BLACK);
+        if (DEBUGFLAG) Serial.println("[GUI] Redraw Map");
+         pipMaps->redrawMap(gpsLat, gpsLon);
+      }      
+
+      // загружаем доп тайлы вокруг точки
+      static unsigned long lastExtLoad = 0;
+      if (!pipMaps->isLoading() && WiFi.status() == WL_CONNECTED) {
+        if (millis() - lastExtLoad > 10000) {
+            lastExtLoad = millis();
+            pipMaps->ensureExtendedTiles(gpsLat,gpsLon,pipMaps->getZoom() , [&](uint8_t p) {
+              tft.fillRect(pbX + 2, pbY + 2, (p * (pbW - 4)) / 100, pbH - 4, TFT_GREEN); });
+        }
+      }
+        tft.setTextDatum(TC_DATUM);
+        tft.setTextSize(2);
+        if (pipMaps->getZoom() == MAP_ZOOM_OUT)
+        {
+          GPSZoomOut = true;
+          tft.setTextColor(TFT_GREEN);
+          tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_BLACK);
+          tft.drawRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
+          tft.drawString("+", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13);
+        } else
+        {
+          GPSZoomOut = false;
+          tft.setTextColor(TFT_BLACK);
+          tft.drawRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
+          tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
+          tft.drawString("+", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13);  
+        }
+      }
+    }
+  }
   // Обновление времени погоды каждую минуту
   static unsigned long lastTimeUpdate = 0;
   if (millis() - lastTimeUpdate > 60000) {
     lastTimeUpdate = millis();
-    if (currentScreen == 4)
-    {
-      if (GPS_Connected == true && gps.hasFix())
-      {
-        float lat = gps.getLat();
-        float lon = gps.getLng();
-        pipMaps->drawMap(lat, lon);
-      }
-    }
-
     if (!weatherHasData() ) 
     {
       weatherUpdate();
@@ -1241,6 +1329,9 @@ if (pulse.isConnected())
   {
     pipMaps = new MapsModule();
     pipMaps->begin();
+    // ------------------
+    pipMaps->disableSprite(); ///  если используется PSRAM то можно заккоментировать. 
+    //Без PSRAM будет нехватка памяти на скачивание доп тайлов карты, если использовать спрайты
     tft.println("OK");
   }
   else
@@ -1506,6 +1597,9 @@ void handleTouch(uint16_t x, uint16_t y) {
   }
   else if (currentScreen == 2) {
       handleRadioSetButtons(x, y);
+  }
+  else if (currentScreen == 4){
+    handleButtonScreen5(x, y);
   }
   else if (currentScreen == TAB_COUNT - 1) {
         HandleButtonsScreen4(x, y);
@@ -2767,20 +2861,25 @@ void drawPipBoyScreen5()
     tft.setTextSize(2);
     tft.drawString("WORLD MAP", TFT_WIDTH_SCREEN / 2, 8);
 
-    float lat = atof(weatherLat.c_str());
-    float lon = atof(weatherLon.c_str());
+   
     bool gpsActive = false;
     
     if (GPS_Connected && gps.hasFix()) {
-        lat = gps.getLat();
-        lon = gps.getLng();
+        gpsLat= gps.getLat();
+        gpsLon= gps.getLng();
         gpsActive = true;
     }
+    else
+    {
+        gpsLat= atof(weatherLat.c_str());
+        gpsLon= atof(weatherLon.c_str());
+    }
     
-    uint8_t have = pipMaps->cachedCount(lat, lon, 16);
+    uint8_t have = pipMaps->cachedCount(gpsLat, gpsLon, 16);
     
     // --- Экран загрузки ---
-    if (have < 9 && WiFi.status() == WL_CONNECTED) {
+    
+    if (have < 9 && WiFi.status() == WL_CONNECTED && GPS_Connected) {
         tft.fillScreen(TFT_BLACK);
         
         tft.setTextDatum(MC_DATUM);
@@ -2795,8 +2894,8 @@ void drawPipBoyScreen5()
         uint16_t pbY = SCREEN_HEADER_Y + SCREEN_CONTENT_H/2 + 10;
         tft.drawRect(pbX, pbY, pbW, pbH, TFT_GREEN);
         
-       // pipMaps->ensureTiles(lat, lon, 16);
-        pipMaps->ensureTiles(lat ,lon ,16 , [&](uint8_t p) {
+       // pipMaps->ensureTiles(gpslat, gpslon, 16);
+        pipMaps->ensureTiles(gpsLat,gpsLon,pipMaps->getZoom() , [&](uint8_t p) {
             tft.fillRect(pbX + 2, pbY + 2, (p * (pbW - 4)) / 100, pbH - 4, TFT_GREEN);
         });
         /*while (pipMaps->isLoading()) {
@@ -2809,7 +2908,15 @@ void drawPipBoyScreen5()
     
 
     
-    pipMaps->drawMap(lat, lon);
+    //pipMaps->drawMap(gpslat, gpslon);
+    // Рисуем GUI один раз: меню, заголовок "WORLD MAP", табы
+   // drawGuiFrame();  
+
+    // Создаём спрайт (один раз при входе на экран)
+    pipMaps->initSprite();
+
+    // Обновляем карту — ничего кроме области MAP_START_X/Y не мелькает
+    pipMaps->redrawMap(gpsLat, gpsLon);
     
         // Заголовок экрана — Top-Center
     tft.setTextDatum(TC_DATUM);
@@ -2817,17 +2924,26 @@ void drawPipBoyScreen5()
     tft.setTextSize(2);
     tft.drawString("WORLD MAP", TFT_WIDTH_SCREEN / 2, 8);
 
-    // GPS статус — Bottom-Left над табами
-    tft.setTextDatum(BL_DATUM);
-    tft.setTextSize(1);
-    if (gpsActive) {
-        tft.setTextColor(TFT_GREEN);
-        tft.drawString("GPS: LIVE | SATS:" + String(gps.getSats()), 10, TAB_Y - 10);
-    } else {
-        tft.setTextColor(TFT_DARKGREEN);
-        tft.drawString("GPS: OFFLINE", 10, TAB_Y - 10);
-    }
+      
+        tft.setTextDatum(TC_DATUM);
+        tft.setTextSize(2);
+        if (pipMaps->getZoom() == MAP_ZOOM_OUT)
+        {
+          GPSZoomOut = true;
+          tft.setTextColor(TFT_GREEN);
+          tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_BLACK);
+          tft.drawRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
+          tft.drawString("+", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13);
+        } else
+        {
+          GPSZoomOut = false;
+          tft.setTextColor(TFT_BLACK);
+          tft.drawRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
+          tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
+          tft.drawString("+", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13);  
+        }
 
+    // GPS статус — Bottom-Left над табами
       UpdateMapInfoPanel();
         
         //return;
@@ -2839,22 +2955,76 @@ void drawPipBoyScreen5()
 
 }
 
+void handleButtonScreen5(uint16_t x, uint16_t y)
+{
+  if (x < 5|| x > TFT_WIDTH_SCREEN - 5 || y > SCREEN_BOTTOM_Y) {
+    return;
+  }
+  
+  if (x >= TFT_WIDTH_SCREEN - 5 - 45 && x <= TFT_WIDTH_SCREEN - 5 && y >= MAP_START_Y && y <= MAP_START_Y + 42) {
+    digitalWrite(LED_G, LOW);
+    delay(30);
+    digitalWrite(LED_G, HIGH);
+    clickBuzzer();
+    pipMaps->toggleZoom();
+
+   // Обновляем кнопку (цвет/текст)
+      
+        tft.setTextDatum(TC_DATUM);
+        tft.setTextSize(2);
+        if (pipMaps->getZoom() == MAP_ZOOM_OUT)
+        {
+          GPSZoomOut = true;
+          tft.setTextColor(TFT_GREEN);
+          tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_BLACK);
+          tft.drawRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
+          tft.drawString("+", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13);
+        } else
+        {
+          GPSZoomOut = false;
+          tft.setTextColor(TFT_BLACK);
+          tft.drawRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
+          tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
+          tft.drawString("+", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13);  
+        }
+    // Загружаем тайлы нового zoom (если нет на SD — скачает)
+        uint16_t pbW = ( TFT_WIDTH_SCREEN / 2);
+        uint16_t pbH = 8;
+        uint16_t pbX = ( TFT_WIDTH_SCREEN / 2) - pbW/2;
+        uint16_t pbY = MAP_START_Y + 8;
+        //статус подгрузки карты
+        tft.fillRect(pbX, pbY, pbW, pbH, TFT_BLACK);
+        pipMaps->ensureTiles(gpsLat,gpsLon,pipMaps->getZoom() , [&](uint8_t p) {
+            tft.fillRect(pbX + 2, pbY + 2, (p * (pbW - 4)) / 100, pbH - 4, TFT_GREEN);
+        });
+
+        // Перерисовываем карту в новом масштабе
+    pipMaps->redrawMap(gpsLat, gpsLon);
+
+    return;
+  }
+
+}
+
+
 void UpdateMapInfoPanel()
 {
-    float lat = atof(weatherLat.c_str());
-    float lon = atof(weatherLon.c_str());
+    
     bool gpsActive = false;
     
     if (GPS_Connected && gps.hasFix()) {
-        lat = gps.getLat();
-        lon = gps.getLng();
+        gpsLat= gps.getLat();
+        gpsLon= gps.getLng();
         gpsActive = true;
-        
+    }else
+    {
+      gpsLat= atof(weatherLat.c_str());
+      gpsLon= atof(weatherLon.c_str());
     }
-        uint8_t have = pipMaps->cachedCount(lat, lon, 16);
+        uint8_t have = pipMaps->cachedCount(gpsLat, gpsLon, 16);
         tft.setTextSize(1);
-        tft.fillRect(5 , 0, 90, 32, TFT_BLACK);
-        tft.drawRect(5,  0, 90, 32, TFT_GREEN);
+        tft.fillRect(5 , 0, 105, 32, TFT_BLACK);
+        tft.drawRect(5,  0, 105, 32, TFT_GREEN);
         
         tft.setTextDatum(TL_DATUM);
         if (have < 3)
@@ -2868,11 +3038,11 @@ void UpdateMapInfoPanel()
             tft.drawString(str, 9,  2);
         }
 
-        if (gpsActive) 
+        if (gpsActive && GPS_Connected) 
           tft.setTextColor(TFT_GREEN);
         else
           tft.setTextColor(TFT_YELLOW);
-          String gpscoords = String(lat, 4) + " " + String(lon, 4);
+          String gpscoords = String(gpsLat, 4) + " " + String(gpsLon, 4);
           tft.drawString(gpscoords, 9,  12);
         
 
@@ -2881,6 +3051,23 @@ void UpdateMapInfoPanel()
           tft.setTextColor(TFT_GREEN);
           tft.drawString("WiFi OFF", 9,  22);
         }
+        tft.setTextDatum(BL_DATUM);
+        tft.setTextSize(1);
+            String gpsTstr = " ";
+            if (gps.hasTime() && GPS_Connected) 
+                gpsTstr = " Time: " + String(gps.getTimeString()) ;
+            else
+                gpsTstr = "                 ";
+            tft.setCursor(5,  TAB_Y - 12);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        if (gpsActive && GPS_Connected) {     
+            tft.print("Openstreetmap.org  [GPS]: <LIVE> | SATS:" + String(gps.getSats()) + gpsTstr + " Speed: " + String(gps.getSpeedKmph()) + " km/h   ") ;
+        } else {
+            tft.print("Openstreetmap.org  [GPS]: <OFFLINE> " + gpsTstr );
+        }
+        tft.setTextColor(TFT_GREEN);
+
+        
 }
 
 void drawTabButtons() {
