@@ -3,12 +3,33 @@
 
 #include <Arduino.h>
 
+#define CYD2_4     // Uncomment if you use 2.4 CYD
+//#define CYD3_5   // Uncomment if you use 3.5 CYD
 #define DEBUGFLAG true
 
 #define PERSON_NAME "SAM"
+/*
 // ======================= TFT PINS SETUP (2.4 CYD Type C) =======================
-// edit UserSetup.h in TFT_eSPI library
+// ===================  edit UserSetup.h in TFT_eSPI library =====================
+//====== CYD 3.5 -----------
 #define ST7796_DRIVER
+#define TFT_WIDTH  320
+#define TFT_HEIGHT 480
+#define TFT_BL    27
+#define TFT_INVERSION_OFF
+#define TFT_RGB_ORDER TFT_BGR   // Colour order Blue-Green-Red
+#define TOUCH_CS 33
+//====== CYD 2.4----------
+#define ILI9341_2_DRIVER
+#define TFT_WIDTH  240
+#define TFT_HEIGHT 320
+#define TFT_BL    27
+#define TFT_INVERSION_ON
+#define TFT_RGB_ORDER TFT_BGR   // Colour order Blue-Green-Red
+#define TOUCH_CS 33
+*/
+// ======================= TFT PINS SETUP =======================
+// edit UserSetup.h in TFT_eSPI library
 #define ESP32_DMA
 #define TFT_CS    15
 #define TFT_DC    2
@@ -16,28 +37,38 @@
 #define TFT_MOSI  13
 #define TFT_MISO  12
 #define TFT_SCLK  14
-#define TFT_BL    27
+
 #define TFT_BACKLIGHT_ON HIGH
-#define TOUCH_CS 33
 
-#define TFT_WIDTH_SCREEN  480
-#define TFT_HEIGHT_SCREEN 320
 
-#define TFT_RGB_ORDER TFT_BGR  // Colour order Blue-Green-Red
+#ifdef CYD2_4
+  #define TFT_WIDTH_SCREEN  320 //480
+  #define TFT_HEIGHT_SCREEN 240 //320
+#endif
 
-#define TFT_INVERSION_OFF
+#ifdef CYD3_5
+  #define TFT_WIDTH_SCREEN  480
+  #define TFT_HEIGHT_SCREEN 320
+#endif
 
-//#define TFT_WIDTH  320
-//#define TFT_HEIGHT 480
 #define SPI_FREQUENCY  80000000
 #define SPI_READ_FREQUENCY  80000000
 #define SPI_TOUCH_FREQUENCY  2500000
 #define USE_HSPI_PORT
 
-// RGB LED PINS (активный LOW)
-#define LED_R     4
-#define LED_G     16
-#define LED_B     17
+// =================  RGB LED PINS (активный LOW)
+#ifdef CYD3_5
+  #define LED_R     4
+  #define LED_G     16
+  #define LED_B     17
+#endif
+
+#ifdef CYD2_4
+  #define LED_R     4
+  #define LED_G     17
+  #define LED_B     16
+#endif
+
 // ========================== SD CARD PINS ==========================
 #define FS_NO_GLOBALS
 #define SD_CS 5
@@ -56,13 +87,13 @@
 #define EEPROM_SIZE 4096
 
 
-// ======================= BMP280 барометр =======================
+// ======================= BMP280 or BME280 барометр =======================
 #define BMP280_ADDRESS 0x76
 #define OFFSET_TEMP
 #define BASE_ALT
 
 // ======================= Pulse Sensor 3 pin Analog ======================= 
-#define PULSE_SENSOR_PIN    255 
+#define PULSE_SENSOR_PIN    255 //use 255 for inactive
 //#define PULSE_SENSOR_VCC 8
 
 // ======================= GPS GY-NE06MV2 ======================= 
@@ -105,12 +136,22 @@
 
 // ======================= UI ========================
 #define TAB_COUNT 6
-#define TAB_H 40
+
+#ifdef CYD3_5
+  #define TAB_H 40   // нижние кнопки
+  #define LVL_TEXT_SIZE 3
+#endif
+
+#ifdef CYD2_4
+  #define TAB_H 35   // нижние кнопки
+  #define LVL_TEXT_SIZE 2 
+#endif
+
 #define TAB_Y (TFT_HEIGHT_SCREEN - TAB_H - 2)
 #define TAB_W (TFT_WIDTH_SCREEN/TAB_COUNT)
 
 #define TAB_TEXT_SIZE 1
-#define LVL_TEXT_SIZE 3
+#define LVL_TEXT_SIZE 2 //3
 #define TIMERS_TEXT_SIZE 1
 #define LEFTPANEL_TEXT_SIZE 1
 #define KEYBOARD_X 5
@@ -121,6 +162,8 @@
 #define KEY_W ((KEYBOARD_W - KEY_GAP * 12) / 10 )//28
 #define KEY_H ((KEYBOARD_H - KEYBOARD_Y - 28 - 22 - KEY_GAP * 14)/6 )//24 KEYBOARD_H - KEY_H - KEY_GAP - 4
 
+#define VBOYSTARTX ((TFT_WIDTH_SCREEN - 180) / 2)
+#define VBOYSTARTY (28 + ((TFT_HEIGHT_SCREEN - 180 - TAB_H - 25) / 2))
 // ================== UI SETUPS SCREEN dimensions =============
 #define  SCREEN_HEADER_Y  40      // Нижняя граница заголовка "WEATHER"
 #define  SCREEN_BOTTOM_Y  (TFT_HEIGHT_SCREEN - TAB_H - 5) // Верхняя граница TAB_H
@@ -131,7 +174,7 @@
 #define  SCREEN_W (TFT_WIDTH_SCREEN - LIST_X - 5)
 #define  SCREEN_CENTER (SCREEN_X + (TFT_WIDTH_SCREEN - SCREEN_X - 5)/2)
 #define  BUTTON_H 30
-#define  INPUT_FIELD_H 20
+#define  INPUT_FIELD_H 20   // высота поля ввода
 
 // ================== UI RADIO BUTTONS =================
 #define RADIO_B_X ((TFT_WIDTH_SCREEN / 6) - 2)

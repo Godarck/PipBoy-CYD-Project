@@ -179,13 +179,14 @@ struct BackUpTimers {
   uint8_t T3min;   
 } __attribute__((packed));   // <-- БЕЗ ПАДДИНГА!
 
-// Калибровка тачскрина (rotation 1)
+// Калибровка тачскрина (rotation 1) 
 // uint16_t calData[5] = { 178, 3762, 323, 3401, 1 };
 
 // (rotation 3)
 //uint16_t calData[5] = { 177, 3713, 340, 3295, 7 };
 //uint16_t calData[5] = { 189, 3748, 307, 3395, 7 };
-uint16_t calData[5] = { 160, 3766, 282, 3404, 7 };
+uint16_t calData[5] = { 318, 3540, 321, 3449, 6 };  //CYD 2.4
+//uint16_t calData[5] = { 160, 3766, 282, 3404, 7 };  //CYD 3.5
 // Настройки отображения часов
 const bool SHOW_24HOUR = true;
 const bool SHOW_AMPM = false;
@@ -234,8 +235,6 @@ setup_t user;
 int currentScreen = 0;
 int lastScreen = -1;  //mp3/
 int vaultFrame = 1;
-const int bitmapStartX = ((TFT_WIDTH_SCREEN - 180) / 2);  // Фиксированное значение для rotation 1
-const int bitmapStartY = ((TFT_HEIGHT_SCREEN - 180 - TAB_H - 20) / 2); 
 
 // General screen
 int ButtonScreen2 = 0;
@@ -1011,12 +1010,12 @@ void UpdateMetaData()
       }
 
         tft.setTextSize(1);
-        String VolumeInfo = "Volume: " + String(radioGetVolume());
+        String VolumeInfo = "Volume: 100";// + String(radioGetVolume());
         int widthtext = tft.textWidth(VolumeInfo);
         int cvy = SCREEN_BOTTOM_Y - 20 - TAB_H;
                   tft.fillRect((TFT_WIDTH_SCREEN / 2) - (widthtext/2), cvy, widthtext + 5, 10, TFT_BLACK);
-                  drawScanlinesButtons((TFT_WIDTH_SCREEN / 2) - (widthtext/2), cvy, 10, widthtext + 5);
-                  tft.drawString(VolumeInfo, TFT_WIDTH_SCREEN / 2, cvy);
+                  drawScanlinesButtons((TFT_WIDTH_SCREEN / 2) - (widthtext/2), cvy, 12, widthtext + 5);
+                  tft.drawString("Volume: " + String(radioGetVolume()), TFT_WIDTH_SCREEN / 2, cvy);
          // }
     }
 
@@ -1592,7 +1591,7 @@ void handleTouch(uint16_t x, uint16_t y) {
   // Обработка по экранам
   if (currentScreen == 0) {
     vaultFrame = (vaultFrame + 1) % 16;
-    drawVaultBoy(bitmapStartX, bitmapStartY, vaultFrame);
+    drawVaultBoy(VBOYSTARTX, VBOYSTARTY, vaultFrame);
     clickBuzzer();
   }
   else if (currentScreen == 2) {
@@ -1663,22 +1662,24 @@ void drawScanlinesButtons(int16_t xS, int16_t yS, int16_t hS, int16_t wS) {
 void drawVaultBoy(int16_t cx, int16_t cy, int8_t frame) {
   if (frame > 16) frame = 0;
   
-  tft.fillRect(cx, cy, 170, 170, TFT_BLACK);
+ tft.fillRect(cx, cy, 170, 170, TFT_BLACK);
   drawScanlinesButtons(cx, cy, 172, 170);
-  tft.drawBitmap(cx, cy, specialBMP[frame], 170, 170, TFT_GREEN);
   
   tft.setTextColor(TFT_GREEN);
   tft.setTextSize(LVL_TEXT_SIZE);
-  tft.setTextDatum(MC_DATUM);
+  tft.setTextDatum(BC_DATUM);
 
   String lvlInfo = PERSON_NAME " Level " + String(frame + 1);
   int widthtext = tft.textWidth(String(lvlInfo + "S"));
   int heighttext = tft.fontHeight();
 
-  tft.fillRect((TFT_WIDTH_SCREEN / 2) - (widthtext/2), TAB_Y - heighttext - heighttext / 2 , widthtext + heighttext, heighttext, TFT_BLACK);
-  drawScanlinesButtons((TFT_WIDTH_SCREEN / 2) - (widthtext/2),TAB_Y - heighttext - heighttext / 2, heighttext + 2, widthtext + heighttext);
-  tft.drawString(lvlInfo, TFT_WIDTH_SCREEN / 2, TAB_Y - heighttext);
+  tft.fillRect((TFT_WIDTH_SCREEN / 2) - (widthtext/2), TAB_Y - heighttext - 2, widthtext, heighttext, TFT_BLACK);
+  drawScanlinesButtons((TFT_WIDTH_SCREEN / 2) - (widthtext/2),TAB_Y - heighttext - 2 , heighttext + 2, widthtext);
+  
+  tft.drawBitmap(cx, cy, specialBMP[frame], 170, 170, TFT_GREEN);
+  tft.drawString(lvlInfo, TFT_WIDTH_SCREEN / 2, TAB_Y - 2);
   //if (DEBUGFLAG) Serial.printf("[GUI] heighttext = %d, start yrect = %d, ystring = %d, tabY = %d\n", heighttext , TAB_Y - heighttext*2, TAB_Y - heighttext, TAB_Y);
+ 
   updateLevel(frame + 1);
 }
 
@@ -1714,7 +1715,7 @@ void drawPipBoyScreen() {
 
   UpdateLeftPanel();
   // Vault Boy
-  drawVaultBoy(bitmapStartX, bitmapStartY, vaultFrame);
+  drawVaultBoy(VBOYSTARTX, VBOYSTARTY, vaultFrame);
   
   UpdateRightPanel();
 
@@ -1912,26 +1913,28 @@ void DrawDate(time_t utc) {
 
   static int prevDayCache = 0;
   if (dd != prevDayCache || lastScreen != currentScreen) {
-    tft.setTextDatum(BC_DATUM);
+    tft.setTextDatum(TC_DATUM);
     char buffer[50];
     if (NOT_US_DATE) {
       sprintf(buffer, "%02d.%02d.%d", dd, mth, yr);
     } else {
       sprintf(buffer, "%02d/%02d/%d", mth, dd, yr);
     }
-
+    tft.setTextColor(TFT_GREEN);
     tft.setTextSize(4);
     int h = tft.fontHeight();
-    tft.fillRect(0, SCREEN_BOTTOM_Y - h*2 - 10, TFT_WIDTH_SCREEN, h, TFT_BLACK);
-    drawScanlinesButtons(0, SCREEN_BOTTOM_Y - h*2 - 10, h, TFT_WIDTH_SCREEN);
-    tft.drawString(buffer, TFT_WIDTH_SCREEN / 2, SCREEN_BOTTOM_Y - h - 10);
+    tft.fillRect(0, (digs[0]->Y() + digs[0]->Height()) + ((SCREEN_BOTTOM_Y - (digs[0]->Y() - digs[0]->Height())) / 2 + h/2), TFT_WIDTH_SCREEN, h, TFT_BLACK);
+    drawScanlinesButtons(0, (digs[0]->Y() + digs[0]->Height()) + ((SCREEN_BOTTOM_Y - (digs[0]->Y() - digs[0]->Height())) / 2 + h/2), h, TFT_WIDTH_SCREEN);
+    tft.drawString(buffer,TFT_WIDTH_SCREEN / 2,  (digs[0]->Y() + digs[0]->Height()) + ((SCREEN_BOTTOM_Y - (digs[0]->Y() - digs[0]->Height())) / 2 + h/2));
 
     int dow = weekday(local);
     String dayNames[] = {"", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     tft.setTextSize(3);
-    tft.fillRect(0,SCREEN_BOTTOM_Y - (h * 3) - 20, TFT_WIDTH_SCREEN, h, TFT_BLACK);
-    drawScanlinesButtons(0, SCREEN_BOTTOM_Y - (h * 3) - 20, h, TFT_WIDTH_SCREEN);
-    tft.drawString(dayNames[dow], TFT_WIDTH_SCREEN / 2, SCREEN_BOTTOM_Y - (h * 2) - 20);
+    //tft.fillRect(0,SCREEN_BOTTOM_Y - (h * 3) - 20, TFT_WIDTH_SCREEN, h, TFT_BLACK);
+
+    tft.fillRect(0, (digs[0]->Y() + digs[0]->Height()) + ((SCREEN_BOTTOM_Y - (digs[0]->Y() - digs[0]->Height())) / 2 - h), TFT_WIDTH_SCREEN, h, TFT_BLACK);
+    drawScanlinesButtons(0, (digs[0]->Y() + digs[0]->Height()) + ((SCREEN_BOTTOM_Y - (digs[0]->Y() - digs[0]->Height())) / 2 - h), h, TFT_WIDTH_SCREEN);
+    tft.drawString(dayNames[dow], TFT_WIDTH_SCREEN / 2, (digs[0]->Y() + digs[0]->Height()) + ((SCREEN_BOTTOM_Y - (digs[0]->Y() - digs[0]->Height())) / 2 - h));
     prevDayCache = dd;
   }
 }
@@ -3023,18 +3026,18 @@ void UpdateMapInfoPanel()
     }
         uint8_t have = pipMaps->cachedCount(gpsLat, gpsLon, 16);
         tft.setTextSize(1);
-        tft.fillRect(5 , 0, 105, 32, TFT_BLACK);
-        tft.drawRect(5,  0, 105, 32, TFT_GREEN);
+        tft.fillRect(5 , 0, 90, 32, TFT_BLACK);
+        tft.drawRect(5,  0, 90, 32, TFT_GREEN);
         
         tft.setTextDatum(TL_DATUM);
         if (have < 3)
         {
             tft.setTextColor(TFT_BROWN);
-            tft.drawString("Area cashed: NO", 9,  2);
+            tft.drawString("Cashed: NO", 9,  2);
         }else
         {
             tft.setTextColor(tft.color565(0, 180, 0));
-            String str = "Area cashed: " + String(have);
+            String str = "Cashed: " + String(have);
             tft.drawString(str, 9,  2);
         }
 
@@ -3042,7 +3045,7 @@ void UpdateMapInfoPanel()
           tft.setTextColor(TFT_GREEN);
         else
           tft.setTextColor(TFT_YELLOW);
-          String gpscoords = String(gpsLat, 4) + " " + String(gpsLon, 4);
+          String gpscoords = String(gpsLat, 3) + " " + String(gpsLon, 3);
           tft.drawString(gpscoords, 9,  12);
         
 
@@ -3061,11 +3064,15 @@ void UpdateMapInfoPanel()
             tft.setCursor(5,  TAB_Y - 12);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
         if (gpsActive && GPS_Connected) {     
-            tft.print("Openstreetmap.org  [GPS]: <LIVE> | SATS:" + String(gps.getSats()) + gpsTstr + " Speed: " + String(gps.getSpeedKmph()) + " km/h   ") ;
+            tft.print("[GPS]: <LIVE> | SATS:" + String(gps.getSats()) + gpsTstr + " Speed: " + String(gps.getSpeedKmph()) + " km/h   ") ;
         } else {
-            tft.print("Openstreetmap.org  [GPS]: <OFFLINE> " + gpsTstr );
+            tft.print("[GPS]: <OFFLINE> " + gpsTstr );
         }
+        tft.setCursor(MAP_START_X + 3, MAP_START_Y + 3);
+        tft.setTextColor(TFT_BLACK, tft.color565(0, 190, 0));
+        tft.print("Openstreetmap.org");
         tft.setTextColor(TFT_GREEN);
+
 
         
 }
@@ -3535,7 +3542,7 @@ void drawWeatherPanelCenter(int cx, int y, int w, int h)
   }
   
   if (!weatherHasData()) {
-    int boxW = 200;
+    int boxW = w - 10;
     int boxH = 80;
     int boxX = cx - boxW / 2;       // Центрируем бокс
     int boxY = y + h / 2 - boxH / 2;
@@ -3595,9 +3602,7 @@ void drawWeatherPanelCenter(int cx, int y, int w, int h)
     tft.drawCircle(circleX, circleY, r, TFT_GREEN);
   }
      
-  // --- Иконка погоды ---
-  //tft.drawString(tempDisplay, cx, tempY);
-  drawWeatherIconCentered(cx, y + 80, weatherPtr->condition, TFT_GREEN);
+
 
   tft.setTextSize(1);
   tft.setTextDatum(TC_DATUM);
@@ -3606,6 +3611,10 @@ void drawWeatherPanelCenter(int cx, int y, int w, int h)
   tw = tft.textWidth("Wind:     188 km/h");
   int windX = cx - tw/ 2;
   int windY = ((SCREEN_BOTTOM_Y - y - th - 50)) + (SCREEN_BOTTOM_Y - (SCREEN_BOTTOM_Y - y - th - 50)) / 2 - (16 + 20) / 2;// + 125;
+
+  // --- Иконка погоды ---
+  //tft.drawString(tempDisplay, cx, tempY);
+  drawWeatherIconCentered(cx, windY - 24, weatherPtr->condition, TFT_GREEN);
 
   // --- Координаты --- 
   String crdStr = "Coords: " + String(weatherLat.substring(0, 7)) + ", " + String(weatherLon.substring(0, 7));
