@@ -86,30 +86,31 @@ Libraries :
 * ====== на главном экране ======
 Слева в углу 3 состояния:
 в рамке - активно
+
 wifi - подключен ли WiFi
+
 Rad - идет ли воспроизведение музыки
+
 W индикатор погоды:
 W Err - данных о погоде нет
 W [E] - данные считанные из EEPROM
 W [O] - Данные актуальные из OpenMeteo
 W [W] - Данные актуальные из WTTR
 
+GPS - подключен ли GPS
+
 Справа (ограничен тремя строками): список предметов ( настраивается в general - time)
-Служит для отображения количества минут до определенного времени (таймер) (в минутах, ограничено 240)
+Служит для отображения количества минут до определенного времени (таймер) (в минутах, ограничено max 240)
 Конструкция строк: (сколько осталось минут) название
 
 
-HP - индикатор пульса
+HP - индикатор пульса при подключенном датчике пульса
 HP - зависит от времени суток (с 8 утра до 8 вечера уменьшается с 420 до 80) Потом восстанавливается до максимума к 03:00
 AP - зависит от времени суток (с 8 утра до 13:00 уменьшается до 60, потом до 5:00 уменьшается до 30.
  Потом с 5:00 до 5:30 уменьшается до 0 каждую минуту отнимаеся 1) Потом восстанавливается до максимума каждые 5 минут.
 
 
  */
-// Include SD
-
-
-
 
 #include "config.h"
 #include "rtc_module.h"
@@ -185,8 +186,15 @@ struct BackUpTimers {
 // (rotation 3)
 //uint16_t calData[5] = { 177, 3713, 340, 3295, 7 };
 //uint16_t calData[5] = { 189, 3748, 307, 3395, 7 };
-uint16_t calData[5] = { 318, 3540, 321, 3449, 6 };  //CYD 2.4
-//uint16_t calData[5] = { 160, 3766, 282, 3404, 7 };  //CYD 3.5
+
+#ifdef CYD2_4
+  uint16_t calData[5] = { 318, 3540, 321, 3449, 6 };  //CYD 2.4
+#endif
+
+#ifdef CYD3_5
+  uint16_t calData[5] = { 160, 3766, 282, 3404, 7 };  //CYD 3.5
+#endif
+
 // Настройки отображения часов
 const bool SHOW_24HOUR = true;
 const bool SHOW_AMPM = false;
@@ -3058,7 +3066,7 @@ void UpdateMapInfoPanel()
         tft.setTextSize(1);
             String gpsTstr = " ";
             if (gps.hasTime() && GPS_Connected) 
-                gpsTstr = " Time: " + String(gps.getTimeString()) ;
+                gpsTstr = " Time: " + String(gps.getTimeString()) + "                     " ;
             else
                 gpsTstr = "                 ";
             tft.setCursor(5,  TAB_Y - 12);
@@ -3324,8 +3332,21 @@ void UpdateLeftPanel()
       {
         yStartP = yStartP + heighttext + 8;
         tft.setCursor(12, yStartP);
-        if (gps.hasFix()) tft.drawRect(9, yStartP - 2, 29, heighttext + 4, TFT_GREEN);
-        tft.print("GPS");
+        if (gps.hasTime())
+        {
+          if (gps.hasFix())
+          { 
+            tft.drawRect(9, yStartP - 2, 29, heighttext + 4, TFT_GREEN);
+            tft.print("GPS");
+          }
+          else
+            tft.print("GPS T");
+          
+        } else
+        {
+          if (gps.hasFix()) tft.drawRect(9, yStartP - 2, 29, heighttext + 4, TFT_GREEN);
+          tft.print("GPS");
+        }
       }
 
   if (pulseSensFound) 

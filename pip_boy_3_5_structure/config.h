@@ -3,9 +3,9 @@
 
 #include <Arduino.h>
 
-#define CYD2_4     // Uncomment if you use 2.4 CYD
-//#define CYD3_5   // Uncomment if you use 3.5 CYD
-#define DEBUGFLAG true
+//#define CYD2_4        // Uncomment if you use 2.4 CYD
+#define CYD3_5          // Uncomment if you use 3.5 CYD
+#define DEBUGFLAG true  // Uncomment if you need Serial monitor debug & GPS blue window debug on screen
 
 #define PERSON_NAME "SAM"
 /*
@@ -27,7 +27,7 @@
 #define TFT_INVERSION_ON
 #define TFT_RGB_ORDER TFT_BGR   // Colour order Blue-Green-Red
 #define TOUCH_CS 33
-*/
+
 // ======================= TFT PINS SETUP =======================
 // edit UserSetup.h in TFT_eSPI library
 #define ESP32_DMA
@@ -39,7 +39,7 @@
 #define TFT_SCLK  14
 
 #define TFT_BACKLIGHT_ON HIGH
-
+*/
 
 #ifdef CYD2_4
   #define TFT_WIDTH_SCREEN  320 //480
@@ -151,7 +151,15 @@
 #define TAB_W (TFT_WIDTH_SCREEN/TAB_COUNT)
 
 #define TAB_TEXT_SIZE 1
-#define LVL_TEXT_SIZE 2 //3
+
+#ifdef CYD3_5
+  #define LVL_TEXT_SIZE 3
+#endif
+  
+#ifdef CYD2_4
+  #define LVL_TEXT_SIZE 2 //3
+#endif
+
 #define TIMERS_TEXT_SIZE 1
 #define LEFTPANEL_TEXT_SIZE 1
 #define KEYBOARD_X 5
