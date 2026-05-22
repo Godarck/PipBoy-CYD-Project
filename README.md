@@ -1,4 +1,20 @@
-* CYD ESP32-2432S024R 2.4" 320x240 TFT ILI9341 + Resisteve Touch + RTC DS1307 + AT24C32 (AT24C64, AT24C256) EEPROM
+* CYD ESP32-2432S024R 2.4" 320x240 TFT ILI9341 + Resisteve Touch
+* CYD ESP32-3248S035R 3.5" 480x320 TFT ST7796  + Resisteve Touch
+
+* 
+  Modules:
+
+  RTC DS1307 with EEPROM or
+  AT24C32 (AT24C64, AT24C256) EEPROM
+  
+  /OPTIONAL/ GPS NEO-6M or simmular 
+
+  /OPTIONAL/ BMP280 or BME280 (if you need humidity)
+
+  /OPTIONAL in progress/ GY-MAX30102 Pulse and ox meter
+
+  /OPTIONAL in progress/ TOF400C laser meter
+
   
 * Stylized Pip-Boy from Fallout
 
@@ -63,7 +79,9 @@ PSRAM: Disabled
 
 * ======== Components =========
 
-  CYD: 2.4 inch ESP32-2432S024R with Resistive Touch (Only Type-C USB connector, RGB LED in front near display.)
+  => CYD: 2.4 inch ESP32-2432S024R with Resistive Touch (Only Type-C USB connector, RGB LED in front near display.)
+
+  => CYD ESP32-3248S035R 3.5" 480x320 TFT ST7796  + Resisteve Touch
   
   RTC + EEPROM: Tyni RTC I2C module DS1307
   
