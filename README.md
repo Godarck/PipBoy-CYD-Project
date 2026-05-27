@@ -7,13 +7,17 @@
   RTC DS1307 with EEPROM or
   AT24C32 (AT24C64, AT24C256) EEPROM
   
-  /OPTIONAL/ GPS NEO-6M or simmular 
+  /OPTIONAL/ GPS NEO-6M or simmular (3 different connections: UART RX-TX, i2c bridge SC16IS750, ESP32C3SuperMini)
 
   /OPTIONAL/ BMP280 or BME280 (if you need humidity)
 
-  /OPTIONAL in progress/ GY-MAX30102 Pulse and ox meter
+  /OPTIONAL/ GY-MAX30102 Pulse and ox meter
 
-  /OPTIONAL in progress/ TOF400C laser meter
+  /OPTIONAL/ TOF10120 laser meter
+
+  /OPTIONAL GYRO in progress/
+
+  /OPTIONAL MAGNITOMETR in progress/
 
   
 * Stylized Pip-Boy from Fallout
@@ -59,11 +63,25 @@ PSRAM: Disabled
   
   TFT_eSPI by Boodmer                   ver 2.5.43 (Copy user_setup.h to TFT_eSPI lib folder)
   
-  Adafruit BusIO by Adafruit            ver 1.17.4  
+  Adafruit BusIO by Adafruit            ver 1.17.4
+  
+  Adafruit BMP280 Library by Adafruit   ver 3.0.0
+  
+  Adafruit BME280 Library by Adafruit   ver 2.3.0
+  
+  PNGDec by Larry Bank                  ver 1.1.6
+  
+  SparkFun MAX3010x pulse and Proximity ver 1.1.2
+  
+  TinyGPSPlus by Mikal Hart             ver 0.0.4 
 
 * ======== Configure: ======== 
   
   Config in config.h
+  
+  //#define CYD2_4        // Uncomment if you use 2.4 CYD
+  
+  //#define CYD3_5          // Uncomment if you use 3.5 CYD
   
   PERSON_NAME - Name in main screen
   
