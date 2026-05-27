@@ -21,6 +21,8 @@ bool rtcIsFound();
 time_t rtcGetNtpTime();               // Получить время с NTP
 void rtcSyncNtpIfNeeded();            // Синхронизация с NTP при необходимости
 void syncTimeFromGPS();                // Синхронизация по GPS
+extern bool NeedSyncDataTime();
+extern void SyncSaveToEEPROM();
 
 // Глобальные переменные
 extern RTC_DS1307 rtc;

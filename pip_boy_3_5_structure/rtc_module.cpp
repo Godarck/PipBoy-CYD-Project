@@ -2,7 +2,8 @@
 #include "config.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
-#include <GPSModule.h>
+//#include <GPSModule.h>
+#include "gps_interface.h"
 
 RTC_DS1307 rtc;
 bool rtcFound = false;
@@ -12,7 +13,7 @@ bool gpsTimeSynced = false;
 unsigned long lastGpsTimeSync = 0;
 
 //class GPSModule;
-extern GPSModule gps;
+//extern GPSModule gps;
 
 // Часовой пояс (настрой под себя)
 TimeChangeRule myStandardTime = {"GMT", First, Sun, Nov, 2, 0};
@@ -25,13 +26,13 @@ static const int NTP_PACKET_SIZE = 48;
 static byte packetBuffer[NTP_PACKET_SIZE];
 static unsigned int localPort = 8888;
 
-void debugPrint(const char* label, int value) {
+/* void debugPrint(const char* label, int value) {
   #if DEBUGFLAG
   Serial.print(label);
   Serial.print("=");
   Serial.println(value);
   #endif
-}
+} */
 
 void rtcInit() {
   
@@ -97,12 +98,19 @@ void syncTimeFromGPS() {
     static unsigned long lastMessage = 0;
     // Не чаще раза в минуту (GPS время не дрифтует, нет смысла чаще)
     if ((millis() - lastGpsTimeSync < 60000) || gpsTimeSynced) return;
-    
+    if (!NeedSyncDataTime()) return;
     // GPS должен отдавать хотя бы время (холодный старт тоже подходит)
-    if (!gps.hasTime()) return;
+    //if (!gps.hasTime()) return;
+    if (!gpsHasFix()) return;
     uint8_t h, m, s, d, mo, y;
-    gps.getTime(h, m, s);
-    gps.getDate(d, mo, y);
+    //gps.getTime(h, m, s);
+    //gps.getDate(d, mo, y);
+    h =  gpsGetHour();          // UTC часы
+    m =  gpsGetMinute();        // UTC минуты
+    s =  gpsGetSecond();        // UTC секунды
+    y = gpsGetYear();          // год
+    m =  gpsGetMonth();         // месяц
+    d =  gpsGetDay(); 
     
     // Если RMC ещё не пришёл — дата будет 0.0.0, ждём.
     if (y == 0 && d == 0 && mo == 0) 
@@ -119,10 +127,10 @@ void syncTimeFromGPS() {
       return;
     }
     
-    int fullYear = y + 2000;  // NMEA: 26 → 2026
+    int fullYear = y;// + 2000;  // NMEA: 26 → 2026
     
     // Защита от мусора
-    if (fullYear < 2024 || fullYear > 2035) return;
+    if (fullYear < 2024 || fullYear > 2035) { Serial.printf("[RTC] Year under limi 2024-2035 = %d\n", fullYear); return;}
     if (mo < 1 || mo > 12 || d < 1 || d > 31) return;
     if (h > 23 || m > 59 || s > 59) return;
     
@@ -137,6 +145,7 @@ void syncTimeFromGPS() {
     if (rtcFound) {
         rtc.adjust(gpsDt);
         rtcSaveToModule();
+        SyncSaveToEEPROM();
     }
     if (currentScreen == 1)
     {
@@ -202,13 +211,17 @@ void rtcSyncNtpIfNeeded() {
   }
   
   if (!ntpSynced || (now() - lastNtpSync > NTP_SYNC_INTERVAL)) {
-    time_t ntpTime = rtcGetNtpTime();
-    if (ntpTime != 0) {
-      setTime(ntpTime);
-      lastNtpSync = now();
-      ntpSynced = true;
-      rtcSaveToModule();
-      if (DEBUGFLAG) Serial.println("NTP sync OK");
+    if (NeedSyncDataTime())
+    {
+      time_t ntpTime = rtcGetNtpTime();
+      if (ntpTime != 0) {
+        setTime(ntpTime);
+        lastNtpSync = now();
+        ntpSynced = true;
+        rtcSaveToModule();
+        SyncSaveToEEPROM();
+        if (DEBUGFLAG) Serial.println("NTP sync OK");
+      }
     }
   }
 }

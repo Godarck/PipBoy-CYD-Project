@@ -1,5 +1,12 @@
 /*
- * ESP32 3.5" 320x480 TFT ILI9341 + XPT2046 Touch + RTC DS1307 + AT24C32 EEPROM + WiFi
+ * ESP32 3.5" 320x480 TFT ST7796 + Resisteve Touch 
+ * ESP32 2.4" 240x320 TFT ILI9341 + Resisteve Touch 
+ + RTC DS1307 
+ + AT24C32 EEPROM 
+ + GPS NEO-6M 
+ + PulseMeter MAX30102 
+ + LaserDistance Meter TOF10120
+
  * Стилизованный Pip-Boy из Fallout
 
 ARDUINO IDE PREFERENCES:
@@ -27,24 +34,8 @@ ARDUINO IDE PREFERENCES:
   Adafruit BMP280 Library by Adafruit   ver 3.0.0
   Adafruit BME280 Library by Adafruit   ver 2.3.0
   PNGDec by Larry Bank                  ver 1.1.6
-
-Libraries : 
-  Используем библиотеку Wire версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/Wire 
-  Используем библиотеку RTClib версии 2.1.4 из папки: ///Documents/Arduino/libraries/RTClib 
-  Используем библиотеку Adafruit BusIO версии 1.17.4 из папки: ///Documents/Arduino/libraries/Adafruit_BusIO 
-  Используем библиотеку Time версии 1.6.1 из папки: ///Documents/Arduino/libraries/Time 
-  Используем библиотеку Timezone версии 1.2.6 из папки: ///Documents/Arduino/libraries/Timezone 
-  Используем библиотеку WiFi версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/WiFi 
-  Используем библиотеку Networking версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/Network 
-  Используем библиотеку HTTPClient версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/HTTPClient 
-  Используем библиотеку NetworkClientSecure версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/NetworkClientSecure 
-  Используем библиотеку ArduinoJson версии 7.4.3 из папки: ///Documents/Arduino/libraries/ArduinoJson 
-  Используем библиотеку ESP8266Audio версии 2.4.1 из папки: ///Documents/Arduino/libraries/ESP8266Audio 
-  Используем библиотеку SD версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/SD 
-  Используем библиотеку FS версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/FS 
-  Используем библиотеку SPI версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/SPI 
-  Используем библиотеку TFT_eSPI версии 2.5.43 из папки: ///Documents/Arduino/libraries/TFT_eSPI 
-  Используем библиотеку SPIFFS версии 3.3.7 из папки: ///Library/Arduino15/packages/esp32/hardware/esp32/3.3.7/libraries/SPIFFS 
+  SparkFun MAX3010x pulse and Proximity ver 1.1.2
+  TinyGPSPlus by Mikal Hart             ver 0.0.4
 
 * ======== See config.h for base setup.  ======== 
   PERSON_NAME - Name in main screen
@@ -60,10 +51,10 @@ Libraries :
   Connectors:      JST 1.25 4pin - for i2c bus
                    JST 1.25 2pin (2 pcs)  - for dinamic and battery
   Audio: 4 Omh speaker
-  Audio mp3: microSD card 1-16 GB
+  ! MicroSD card 1-16 GB for Radio via mp3 & for cash map png tiles
 
  Для работы часов нужен модуль с флэшкой памяти (на модуле должно быть две 8 ногих микросхемы)/ либо флэшка памяти отдельно i2c
- 
+ PULSE MAX30102 or MAX30105 (better)
 
  динамик ( можно от мобильника 4 Ом , например с старых айфонов)
  модуль сенсора пульса (опционально) пока не реализовано
@@ -84,7 +75,7 @@ Libraries :
 Индикаторы HP - AP высчитываются сами, в зависимости от врмени суток. В течение дня - уменьшаются. После вечера - восполняются.
 
 * ====== на главном экране ======
-Слева в углу 3 состояния:
+Слева в углу 4 состояния:
 в рамке - активно
 
 wifi - подключен ли WiFi
@@ -97,7 +88,7 @@ W [E] - данные считанные из EEPROM
 W [O] - Данные актуальные из OpenMeteo
 W [W] - Данные актуальные из WTTR
 
-GPS - подключен ли GPS
+GPS - подключен ли GPS 
 
 Справа (ограничен тремя строками): список предметов ( настраивается в general - time)
 Служит для отображения количества минут до определенного времени (таймер) (в минутах, ограничено max 240)
@@ -120,9 +111,11 @@ AP - зависит от времени суток (с 8 утра до 13:00 у�
 #include "ui_module.h"
 #include "radio.h"
 #include "BMP280Module.h"
-#include "pulse_sensor.h"
-#include "GPSModule.h"
+#include "pulse.h"
+//#include "GPSModule.h"
+#include "gps_interface.h"
 #include "maps.h"
+#include "tof10120.h"
 
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -154,21 +147,28 @@ time_t prevDisplay = 0;
 char StandartWiFiPass[32] = "c9608b67b936";
 
 // struct fo 32 bytes for eeprom
-struct BackUpDataGPS {
+
+//date time update slot 0
+
+//Weather slot 1
+struct BackUpDataGPS {    //slot 1
   char GPS_LAT[15];        // 15 байт
   char GPS_LON[15];              // 15 байт
   uint8_t icCels; 
 } __attribute__((packed));   // <-- БЕЗ ПАДДИНГА!
 
-struct BackUpDataWiFi {
+//WiFi BackUpDataWiFi //slot 2
+struct BackUpDataWiFi {   //slot 2
   char WiFi_Pass[32];           // 32 байт
 } __attribute__((packed));   // <-- БЕЗ ПАДДИНГА!
 
-struct BackUpDataFolder {
+//mp3 folder slot 3
+struct BackUpDataFolder {   //slot 3
   char SDFolder[32];           // 32 байт
 } __attribute__((packed));   // <-- БЕЗ ПАДДИНГА!
 
-struct BackUpTimers {
+//timers slot 4
+struct BackUpTimers {       //slot 4
   char T1Name[8]; // 8 байт
   char T2Name[8]; 
   char T3Name[8];  
@@ -180,6 +180,13 @@ struct BackUpTimers {
   uint8_t T3min;   
 } __attribute__((packed));   // <-- БЕЗ ПАДДИНГА!
 
+//sync date time slot 5
+struct LastSyncDateTime {     // SLOT 5
+  unsigned long lastSyncDT;    // millis() когда получено         
+};
+
+time_t eepromUpdateDataTime = 0;
+
 // Калибровка тачскрина (rotation 1) 
 // uint16_t calData[5] = { 178, 3762, 323, 3401, 1 };
 
@@ -187,12 +194,14 @@ struct BackUpTimers {
 //uint16_t calData[5] = { 177, 3713, 340, 3295, 7 };
 //uint16_t calData[5] = { 189, 3748, 307, 3395, 7 };
 
+//CYD 2.4 (rotation 1) 
 #ifdef CYD2_4
-  uint16_t calData[5] = { 318, 3540, 321, 3449, 6 };  //CYD 2.4
+  uint16_t calData[5] = { 318, 3540, 321, 3449, 6 };  
 #endif
 
+ //CYD 3.5 (rotation 1) 
 #ifdef CYD3_5
-  uint16_t calData[5] = { 160, 3766, 282, 3404, 7 };  //CYD 3.5
+  uint16_t calData[5] = { 160, 3766, 282, 3404, 7 }; 
 #endif
 
 // Настройки отображения часов
@@ -224,12 +233,21 @@ TFT_eSprite sprite = TFT_eSprite(&tft);
 // BMP
 bool bmpFound = false;
 
-// PULSE SENSOR
+// PULSE SENSOR  Available flag
 bool pulseSensFound = false;
 bool psActive = false;
 
-// GPS
-GPSModule gps(Serial2, /*rx=*/ GPS_ONRX_PIN, /*tx=*/GPS_ONTX_PIN, /*baud=*/9600);
+/* // GPS
+#ifdef CYD2_4
+  GPSModule gps(Serial,  GPS_ONRX_PIN, GPS_ONTX_PIN, 9600);
+#endif
+
+#ifdef CYD3_5
+  GPSModule gps(Serial2, GPS_ONRX_PIN, GPS_ONTX_PIN, 9600);
+#endif
+*/
+
+// GPS Available flag
 bool GPS_Connected = false;
 
 MapsModule* pipMaps = nullptr;
@@ -256,6 +274,9 @@ int currentAP = 420;
 int apMax = 210;   // Максимум AP (можно менять, например, при прокачке персонажа)
 int hpMax = 320;   // Максимум HP
 
+// laser TOF  Available flag
+bool laserModule = false;
+bool laserActive = false;
 
 // === RADIO SETTINGS ===
 int radioPlaySource = 0;        // 0 = SD (default), 1 = WiFi, 2 = Ext
@@ -275,16 +296,23 @@ SemaphoreHandle_t radioMutex = NULL;
 
 SPIClass SDSPI(VSPI);
 
-/*-------- DEBUGGING ----------*/
-void Debug(String label, uint8_t val)
-{
-  if (DEBUGFLAG) 
-  {
-    Serial.print(label);
-    Serial.print("=");
-    Serial.println(val);
-  }
-}
+// ============================================================
+// STARTUP CONSOLE — автопрокрутка + посимвольная печать
+// ============================================================
+
+
+TFT_eSprite startupSprite(&tft);
+
+static int16_t  su_cx = 0;
+static int16_t  su_cy = 0;
+static uint16_t su_delayMs = 0;
+static uint8_t  su_font = 1;
+static uint8_t  su_size = 1;
+static int16_t  su_lineH = 8;
+
+static char     su_buf[6];   // буфер на 5 символов + '\0'
+static uint8_t  su_bufLen = 0;
+
 
 // ======================= ПРОТОТИПЫ ФУНКЦИЙ =======================
 
@@ -390,6 +418,9 @@ void DrawDigitsOneByOne();
 void ParseDigits(time_t utc);
 void DrawDate(time_t utc);
 void syncTimeFromGPS();
+bool NeedSyncDataTime();
+void SyncSaveToEEPROM();
+bool SyncLoadFromEEPROM();
 
 // погода
 bool isDayTime();
@@ -446,8 +477,11 @@ void clickBuzzerKey();
 
 // ======================= SETUP =======================
 void setup() {
-  Serial.begin(115200);
-  delay(1000);
+  if (DEBUGFLAG)
+  {
+    Serial.begin(115200);
+    delay(1000);
+  }
   
   if (DEBUGFLAG) Serial.println("Pip-Boy starting...");
   
@@ -500,8 +534,8 @@ void setup() {
 
   }
   
-   gps.begin();
-    if (DEBUGFLAG) Serial.println("[GPS] UART инициализирован");
+   //gps.begin();
+    //if (DEBUGFLAG) Serial.println("[GPS] UART инициализирован");
     
     
   // TFT
@@ -587,52 +621,45 @@ void loop() {
   geigerTick(vaultFrame);
   if (GPS_Connected == true)
   {
-    gps.update();
+    gpsUpdate();
   }
+  
   static unsigned long lastBpmUpdate = 0;
   
   static unsigned long lastHPAPUpdate = 0;
   if (pulseSensFound)
   {
-        //pulse.update();
-        
-        if (millis() - lastBpmUpdate > 200) {
-            lastBpmUpdate = millis();    
-          pulseSensorUpdate();
-        }
-
-        
+       pulseUpdate();   
   }
+
   if (millis() - lastHPAPUpdate > 1000) {
             lastHPAPUpdate = millis();
-            updateHPAP();
-
+            
     if (GPS_Connected == true)
     {
       if (currentScreen == 4)
         UpdateMapInfoPanel();
+      if (DEBUGFLAG && GPS_Connected) 
+        {
         String srcg = "[GPS] Satt: 000 On: 0";
-        if (gps.hasFix()) {
+        if (gpsHasFix()) {
                 syncTimeFromGPS();
-                srcg = "[GPS] Active D: " + String(gps.getTimeString()) ;
-        } else if (gps.hasTime()) {
-                syncTimeFromGPS();
-                srcg = "[GPS] Time: " + String(gps.getTimeString()) ;
-        }
+                srcg = "[GPS] Active T: " + String(gpsGetHour()) + ":" + String(gpsGetMinute()) + ":" + String(gpsGetSecond());
+        } 
         // Вариант 3: Полная тишина
         else {
             srcg = "[GPS] No data from GPS";
         }
 
-        if (DEBUGFLAG && GPS_Connected) 
-        {
+        
           tft.setTextSize(1);
           tft.setTextDatum(TL_DATUM);
           tft.setTextColor(TFT_GREEN);
           // Закрасить старое значение
-          String src = "[GPS] Active D: 00.00.00";
+          //String src = "[GPS] Active D: 00.00.00";
+          
+          String src = "[GPS] Satt: " + String(gpsGetSats()) + " Acc: " + String(gpsGetHdop());
           int tws = tft.textWidth(src); 
-          src = "[GPS] Satt: " + String(gps.getSats()) + " T: " + String(gpsTimeSynced);//String(gps.hasFix());
           tft.fillRect(7, SCREEN_BOTTOM_Y - 30 - TAB_H, tws, 22, TFT_NAVY);
          // tft.setCursor(7, SCREEN_BOTTOM_Y - 29 - TAB_H);
           tft.drawString(srcg, 7, SCREEN_BOTTOM_Y - 30 - TAB_H );
@@ -640,9 +667,35 @@ void loop() {
           tft.drawString(src, 7, SCREEN_BOTTOM_Y - 16 - TAB_H );
         }
     }
+
+    if (pulseSensFound)
+  {
+    pulseSensorUpdate();
   }
 
-// Обновление карты каждые 5 сек
+  }
+
+
+  if (laserModule && currentScreen == 4 && laserActive)
+    {
+        static unsigned long lastTofCheck = 0;
+        if (millis() - lastTofCheck > TOF10120_READ_INTERVAL) {
+        lastTofCheck = millis();
+        int laserDist = tofSensor.readDistanceFiltered();
+        if (laserDist != TOF10120_ERROR_VALUE)
+        {
+          tft.setTextDatum(TR_DATUM);
+          tft.setTextSize(1);
+          tft.setTextColor(TFT_GREEN);
+          tft.fillRect(TFT_WIDTH_SCREEN - 80 , 5, 80, 10, TFT_BLACK);
+          String laserStr = "Dist: " + String(laserDist) + "mm.";
+          tft.drawString(laserStr, TFT_WIDTH_SCREEN, 7);
+        }
+        }
+    }
+
+
+// Обновление карты каждые 10 сек
   static unsigned long lastMapUpdate = 0;
   static float gpsLat_last = atof(DEFAULT_LAT);
   static float gpsLon_last = atof(DEFAULT_LON);
@@ -650,16 +703,24 @@ void loop() {
   if (millis() - lastMapUpdate > 10000) {
     lastMapUpdate = millis();
 
+    if (currentScreen == 0)
+      {
+          UpdateLeftPanel();
+          updateHPAP();
+          UpdateRightPanel();
+      }
+    
+
     if (currentScreen == 4)
     {
         int16_t  pbW = ( TFT_WIDTH_SCREEN / 2);
         uint16_t pbH = 8;
         uint16_t pbX = ( TFT_WIDTH_SCREEN / 2) - pbW/2;
         uint16_t pbY = MAP_START_Y - 9;
-      if (GPS_Connected == true && gps.hasFix())
+      if (GPS_Connected == true && gpsHasFix())
       {
-        gpsLat= gps.getLat();
-        gpsLon= gps.getLng();
+        gpsLat= gpsGetLat();
+        gpsLon= gpsGetLon();
         float dLat = abs(gpsLat - gpsLat_last);
         float dLon = abs(gpsLon - gpsLon_last);
       
@@ -764,12 +825,7 @@ void loop() {
       }
     }
     
-    if (currentScreen == 0)
-    {
-        updateHPAP();
-        UpdateLeftPanel();
-        UpdateRightPanel();
-    }
+    
 
     if (currentScreen == 2)
     {
@@ -782,18 +838,13 @@ void loop() {
   if (GPS_Connected && DEBUGFLAG)
   {
 
-    if (gps.hasFix()) {
-        Serial.printf("[GPS] Sats: %d | Lat: %.6f | Lng: %.6f | Alt: %.1f m | Speed: %.1f km/h | Time: %s\n",
-            gps.getSats(),
-            gps.getLat(),
-            gps.getLng(),
-            gps.getAlt(),
-            gps.getSpeedKmph(),
-            gps.getTimeString().c_str());
-    } else if (gps.hasTime()) {
-            Serial.printf("[GPS] - TIME ONLY - Sats: %d (Searching...) | %s UTC | Wait Coords...\n",
-            gps.getSats(),
-            gps.getTimeString().c_str());
+    if (gpsHasFix()) {
+        Serial.printf("[GPS] Sats: %d | Lat: %.6f | Lng: %.6f | Acc: %.1f | Speed: %.1f km/h | Time: --\n",
+            gpsGetSats(),
+            gpsGetLat(),
+            gpsGetLon(),
+            gpsGetHdop(),
+            gpsGetSpeedKmph());
     }
     // Вариант 3: Полная тишина
     else {
@@ -1098,287 +1149,478 @@ int8_t getPinName(int8_t pin)
   return pin; // Invalid pin
 }
 
-void initI2C()
-{
-  Wire.begin(RTC_SDA,RTC_SCL);
+// ============================================================
+// STARTUP CONSOLE — 1‑бит спрайт, вывод пачками по 5 символов
+// ============================================================
+
+
+
+inline void suUpdateMetrics() {
+    startupSprite.setTextFont(su_font);
+    startupSprite.setTextSize(su_size);
+    su_lineH = startupSprite.fontHeight();
+    if (su_lineH <= 0) su_lineH = 8 * su_size;
+}
+
+// Ширина текущего содержимого буфера (пиксели)
+inline int16_t suBufWidth() {
+    if (su_bufLen == 0) return 0;
+    if (su_font <= 6) return su_bufLen * 6 * su_size;  // GLCD шрифты фиксированы
+    char tmp = su_buf[su_bufLen];
+    su_buf[su_bufLen] = '\0';
+    int16_t w = startupSprite.textWidth(su_buf);
+    su_buf[su_bufLen] = tmp;
+    return w;
+}
+
+// Создать монохромный спрайт на весь экран
+void startupInit(uint8_t font, uint8_t textSize = 1) {
+    startupSprite.setColorDepth(1);
+    startupSprite.createSprite(TFT_WIDTH_SCREEN, TFT_HEIGHT_SCREEN);
+    startupSprite.setBitmapColor(TFT_GREEN, TFT_BLACK);
+    startupSprite.fillSprite(TFT_BLACK);
+
+    startupSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+    startupSprite.setTextWrap(false);
+
+    su_font = font;
+    su_size = textSize;
+    suUpdateMetrics();
+
+    su_cx = 0;
+    su_cy = 0;
+    su_bufLen = 0;
+    startupSprite.pushSprite(0, 0);
+}
+
+void startupSetDelay(uint16_t ms) {
+    su_delayMs = ms;
+}
+
+// Прокрутка спрайта вверх
+void startupScroll(int16_t dy) {
+    if (dy <= 0) return;
+    startupSprite.scroll(0, -dy);
+    startupSprite.fillRect(0, TFT_HEIGHT_SCREEN - dy, TFT_WIDTH_SCREEN, dy, TFT_BLACK);
+    su_cy -= dy;
+    if (su_cy < 0) su_cy = 0;
+}
+
+// Перевод строки с автопрокруткой
+void startupNewLine() {
+    su_cx = 0;
+    su_cy += su_lineH;
+    if (su_cy + su_lineH > TFT_HEIGHT_SCREEN) {
+        int16_t need = su_cy + su_lineH - TFT_HEIGHT_SCREEN;
+        if (need % su_lineH) need += su_lineH - (need % su_lineH);
+        startupScroll(need);
+    }
+}
+
+// Сбросить буфер в спрайт и вытолкнуть на экран
+void startupFlush() {
+    if (su_bufLen == 0) return;
+
+    char tmp = su_buf[su_bufLen];
+    su_buf[su_bufLen] = '\0';
+
+    startupSprite.setCursor(su_cx, su_cy);
+    startupSprite.print(su_buf);
+    su_cx = startupSprite.getCursorX();
+
+    su_buf[su_bufLen] = tmp;
+    su_bufLen = 0;
+
+    startupSprite.pushSprite(0, 0);
+    
+    if (su_delayMs) delay(su_delayMs);
+}
+
+// Печать одного символа с буферизацией
+void startupPutChar(char c) {
+    if (c == '\n') {
+        startupFlush();          // сбросить то, что накопилось
+        startupNewLine();
+        startupSprite.pushSprite(0, 0);
+        if (su_delayMs) delay(su_delayMs);
+        return;
+    }
+
+    // Проверка: влезет ли символ в текущую строку?
+    int16_t cw = (su_font <= 6) ? (6 * su_size) : startupSprite.textWidth(String(c));
+    if (su_cx + suBufWidth() + cw > TFT_WIDTH_SCREEN) {
+        startupFlush();
+        startupNewLine();
+    }
+
+    su_buf[su_bufLen++] = c;
+
+    if (su_bufLen >= 5) {
+        startupFlush();
+    }
+}
+
+// Печать строки посимвольно (через буфер)
+void startupPrint(const char* s) {
+    if (!s) return;
+    while (*s) startupPutChar(*s++);
+}
+
+// Строка + перевод каретки
+void startupPrintln(const char* s) {
+    startupPrint(s);
+    startupPutChar('\n');
+}
+
+// printf-стиль
+void startupPrintf(const char* fmt, ...) {
+    char buf[128];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    startupPrint(buf);
+}
+
+// Освободить память (сбрасывает остаток буфера перед удалением)
+void startupRelease() {
+    startupFlush();
+    startupSprite.deleteSprite();
+}
+
+
+void initI2C() {
+  Wire.begin(RTC_SDA, RTC_SCL);
   byte error, address;
   int nDevices = 0;
-  tft.setTextColor(TFT_GREEN);
-  tft.println("Scanning for I2C devices ...");
+
+  // startupSetColor(TFT_GREEN);
+  startupPrintln("Scanning for I2C devices ...");
   if (DEBUGFLAG) Serial.print("============ Scanning for I2C devices ... ============\n");
-  tft.println(" ");
-  delay(20);
+
+  //startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(20);
+
   for (address = 0x01; address < 0x7f; address++) {
-    
     Wire.beginTransmission(address);
     error = Wire.endTransmission();
     if (error == 0) {
-      tft.setTextColor(TFT_GREEN);
+      // startupSetColor(TFT_GREEN);
+
+      startupNewLine();
       clackBuzzer();
-      if (DEBUGFLAG) Serial.printf("I2C device found at address 0x%02X\n", address);
-      tft.printf("I2C device found at address 0x%02X\n", address);
-      tft.println(" ");
-      delay(20);
+      if (DEBUGFLAG) Serial.printf("I2C device found at address   0x%02X\n", address);
+      startupPrintf("I2C device found at address   0x%02X\n", address);
+      //startupNewLine();
+      startupSprite.pushSprite(0, 0);
+      //delay(20);
       nDevices++;
     } else if (error != 2) {
-      tft.setTextColor(TFT_RED);
+      // startupSetColor(TFT_RED);
       clackBuzzer();
-      if (DEBUGFLAG) Serial.printf("Error %d at address 0x%02X\n", error, address);
-      tft.printf("Error %d at address 0x%02X\n", error, address);
-      tft.println(" ");
-      delay(2000);
+
+      startupNewLine();
+      if (DEBUGFLAG) Serial.printf("Error %d at address           0x%02X\n", error, address);
+      startupPrintf("Error %d at address           0x%02X\n", error, address);
+      //startupNewLine();
+      startupSprite.pushSprite(0, 0);
+      //delay(2000);
     }
   }
+
   if (nDevices == 0) {
-    tft.setTextColor(TFT_RED);
-    if (DEBUGFLAG) Serial.print("No I2C devices found!\n"); 
-    tft.println("No I2C devices found");
-    tft.println(" ");
-    delay(2000);
+    // startupSetColor(TFT_RED);
+    startupNewLine();
+    if (DEBUGFLAG) Serial.print("No I2C devices found!\n");
+    startupPrintln("No I2C devices found.");
+    //startupNewLine();
+    startupSprite.pushSprite(0, 0);
+    //delay(2000);
   }
+
   if (DEBUGFLAG) Serial.println("============== END OF I2C SCANNER ===============\n");
-  tft.setTextColor(TFT_GREEN);
-  delay(200);
+  // startupSetColor(TFT_GREEN);
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
 }
 
-void initStartUp(){
+
+
+
+
+void initStartUp() {
+  // --- Логотип и анимация (рисуем сразу на экран) ---
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
-  tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80)/2, logovt180x80, 180, 80, tft.color565(0, 80, 0));
+  tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80) / 2,
+                 logovt180x80, 180, 80, tft.color565(0, 80, 0));
   startBuzzer();
-  tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80)/2, logovt180x80, 180, 80, tft.color565(0, 180, 0));
+  tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80) / 2,
+                 logovt180x80, 180, 80, tft.color565(0, 180, 0));
   delay(350);
-  tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80)/2, logovt180x80, 180, 80, TFT_GREEN);
+  tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80) / 2,
+                 logovt180x80, 180, 80, TFT_GREEN);
   delay(150);
-  tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80)/2, logovt180x80, 180, 80, tft.color565(0, 180, 0));
+  tft.drawBitmap((TFT_WIDTH_SCREEN - 180) / 2, (TFT_HEIGHT_SCREEN - 80) / 2,
+                 logovt180x80, 180, 80, tft.color565(0, 180, 0));
 
   sweepTone(15800, 20000, 200, 3);
-   drawScanlines();
-  delay(100);
-  //tft.color565(0, 180, 0)
-  //delay(500);
+  drawScanlines();
+ // delay(100);
+
+  // --- Переходим на спрайт-консоль ---
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
-  tft.setTextFont(clockFont);
-  tft.setTextSize(1);
-  tft.setCursor(10, 15);
-  delay(250);
-  tft.setTextColor(TFT_GREEN);
-  tft.print("Loading ");
-  
 
+#ifdef CYD2_4
+  startupInit(clockFont, 1);
+#endif
+
+#ifdef CYD3_5
+  startupInit(clockFont, 1);
+#endif
+
+  startupSetDelay(0);
+  // startupSetColor(TFT_GREEN);
+
+  delay(50);
+#ifdef CYD3_5
+  startupPrintln("=== RobCo Ind. PipBoy 3000 v3.5 ===");
+#endif
+#ifdef CYD2_4
+  startupPrintln("=== RobCo Ind. PipBoy 3000 v2.4 ===");
+#endif
+
+  startupNewLine();
+  startupPrintln("******* Start-up Self Check *******");
+
+  startupNewLine();
   Wire.begin(RTC_SDA, RTC_SCL);
+  //delay(50);
 
-  delay(50);
   rtcInit();
-  tft.print(".");
-  delay(50);
+  //delay(50);
   eepromInit();
-  tft.print(".");
-  delay(50);
+  //startupPrint(".");
+  //delay(50);
   wifiInit();
-  tft.println(".");
-  delay(50);
-  tft.println(" ");
+  //startupPrintln(".");
+  //delay(50);
+
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
   initI2C();
-  
-  //pinMode(PULSE_SENSOR_VCC, OUTPUT);
-  
-  //digitalWrite(PULSE_SENSOR_VCC, HIGH);
-  //delay(200);
-  pulse.begin();
   clackBuzzer();
-if (pulse.isConnected())
-{
-    tft.println("PULSE SENSOR module -------- OK");
-    pulseSensFound = true;
-    //digitalWrite(PULSE_SENSOR_VCC, LOW);
-}
-  else
-  {
-    tft.print("PULSE SENSOR module  -------- ");
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
-    pulseSensFound = false;
-    //digitalWrite(PULSE_SENSOR_VCC, LOW);
-  }
-  tft.println(" ");
-  delay(200);
-  tft.setTextColor(TFT_GREEN);
-  
-  clackBuzzer();
+
+  startupPrint("RTC module ------------------ ");
   if (rtcFound)
-    tft.println("RTC module ------------------ OK");
-  else
-  {
-    tft.print("RTC module ------------------ ");
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
+    startupPrintln("OK");
+  else {
+    // startupSetColor(TFT_RED);
+    startupPrintln("ERROR");
   }
-  tft.println(" ");
-  delay(200);
-  tft.setTextColor(TFT_GREEN);
-  
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  // startupSetColor(TFT_GREEN);
 
   clackBuzzer();
-  if (bmpInit())
-  {
-    tft.println("BMP module ------------------ OK");
+
+  startupPrint("BMP module ------------------ ");
+  if (bmpInit()) {
+    startupPrintln("OK");
     bmpCalibrateAltitude();
     bmpFound = true;
-  }
-  else
-  {
-    tft.print("BMP module ------------------ ");
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
+  } else {
+    // startupSetColor(TFT_RED);
+    startupPrintln("ERROR");
     bmpFound = false;
   }
-  tft.println(" ");
-  delay(200);
-  tft.setTextColor(TFT_GREEN);
-
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  // startupSetColor(TFT_GREEN);
 
   clackBuzzer();
-  if (gps.init(/*timeoutMs=*/1000, /*retries=*/3))
-  {
-    tft.println("GPS module ------------------ OK");
+
+  startupPrint("GPS module ------------------ ");
+
+  gpsInit();
+
+  if (gpsCheckConnection()) {
+    startupPrintln("OK");
     if (DEBUGFLAG) Serial.println("[GPS] Module connected: [OK]");
     GPS_Connected = true;
-  }
-  else
-  {
-    tft.print("GPS module ------------------ ");
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
-      if (DEBUGFLAG)   Serial.println("[GPS] Module connected: [ERROR]");
+  } else {
+    // startupSetColor(TFT_RED);
+    startupPrintln("ERROR");
+    if (DEBUGFLAG) Serial.println("[GPS] Module connected: [ERROR]");
     GPS_Connected = false;
   }
-  tft.println(" ");
-  delay(200);
-  tft.setTextColor(TFT_GREEN);
-  
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  // startupSetColor(TFT_GREEN);
 
   clackBuzzer();
-  if (eepromFound)
-  {
-    tft.println("EEPROM module --------------- OK");
-    tft.println(" ");
-    if (LoadBackUpFromEPPR())
-    {
-      tft.println("BACKUP LOAD ----------------- OK");
-    }
-    else
-    {
-      tft.print("BACKUP LOAD ----------------- ");
-      tft.setTextColor(TFT_RED);
-      tft.println("ERROR");
+  if (eepromFound) {
+    startupPrintln("EEPROM module --------------- OK");
+    startupNewLine();
+    startupSprite.pushSprite(0, 0);
+
+    startupPrint("BACKUP LOAD ----------------- ");
+    if (LoadBackUpFromEPPR()) {
+      startupPrintln("OK");
+    } else {
+      // startupSetColor(TFT_RED);
+      startupPrintln("ERROR");
       SaveBackUpToEPPR();
     }
-  }
-  else
-  {
-    tft.print("EEPROM module --------------- ");
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
-    tft.setTextColor(TFT_GREEN);
-    tft.println(" ");
-    tft.print("BACKUP LOAD ----------------- ");
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
+  } else {
+    startupPrint("EEPROM module --------------- ");
+    // startupSetColor(TFT_RED);
+    startupPrintln("ERROR");
+    // startupSetColor(TFT_GREEN);
+    startupNewLine();
+    startupSprite.pushSprite(0, 0);
+    startupPrint("BACKUP LOAD ----------------- ");
+    // startupSetColor(TFT_RED);
+    startupPrintln("ERROR");
   }
 
   clackBuzzer();
-  tft.println(" ");
-  delay(200);
-  tft.setTextColor(TFT_GREEN);
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  // startupSetColor(TFT_GREEN);
+
+  startupPrint("WEATHER backup module ------- ");
   if (weatherLoadFromEEPROM())
-    tft.println("WEATHER backup module ------- OK");
-  else
-  {
-    tft.print("WEATHER backup module ------- ");
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
+    startupPrintln("OK");
+  else {
+    // startupSetColor(TFT_RED);
+    startupPrintln("ERROR");
   }
 
-  tft.println(" ");
-  delay(200);
-  tft.setTextColor(TFT_GREEN);
-  tft.println("Wi-Fi module ---------------- OK");
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  // startupSetColor(TFT_GREEN);
+  startupPrintln("Wi-Fi module ---------------- OK");
 
-  tft.println(" ");
-  delay(200);
-  tft.setTextColor(TFT_GREEN);
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  // startupSetColor(TFT_GREEN);
+  startupPrintln("KEYBOARD module ------------- OK");
 
-  tft.println("KEYBOARD module ------------- OK");
-
-
-  radioInit();  // Инициализация радио
+  radioInit();
 
   clackBuzzer();
-  tft.println(" ");
-  delay(200);
-  tft.print("SD card --------------------- ");
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  startupPrint("SD card --------------------- ");
   if (sdCardInitialized)
-    tft.println("OK");
-  else
-  {
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
-    tft.setTextColor(TFT_GREEN);
+    startupPrintln("OK");
+  else {
+    // startupSetColor(TFT_RED);
+    startupPrintln("ERROR");
+    // startupSetColor(TFT_GREEN);
   }
-  
+
   clackBuzzer();
-  tft.println(" ");
-  delay(200);
-  tft.print("MAP module ------------------ ");
-  if (sdCardInitialized)
-  {
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  startupPrint("MAP module ------------------ ");
+  if (sdCardInitialized) {
     pipMaps = new MapsModule();
     pipMaps->begin();
-    // ------------------
-    pipMaps->disableSprite(); ///  если используется PSRAM то можно заккоментировать. 
-    //Без PSRAM будет нехватка памяти на скачивание доп тайлов карты, если использовать спрайты
-    tft.println("OK");
-  }
-  else
-  {
-    tft.setTextColor(TFT_RED);
-    tft.println("ERROR");
-    tft.setTextColor(TFT_GREEN);
+    pipMaps->disableSprite();
+    startupPrintln("OK");
+  } else {
+    // startupSetColor(TFT_RED);
+    startupPrintln("ERROR");
+    // startupSetColor(TFT_GREEN);
   }
 
-    radioStartTask();
-  // Тест RGB
-  tft.println(" ");
-  delay(200);
-  tft.setTextColor(TFT_GREEN);
-  tft.print("RGB module ------------");
-  delay(200);
-  tft.print("--");
+  clackBuzzer();
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  startupPrint("LASER module ---------------- ");
+  if (tofSensor.isAvailable()) {
+    laserModule = true;
+    startupPrintln("OK");
+  } else {
+    // startupSetColor(TFT_RED);
+    laserModule = false;
+    startupPrintln("ERROR");
+    // startupSetColor(TFT_GREEN);
+  }
+
+  radioStartTask();
+
+  clackBuzzer();
+
+  startupNewLine();
+  startupPrint("PULSE SENSOR module  -------- ");
+  if (pulseInit()) pulseSensFound = true;
+  if (pulseCheckConnection()) pulseSensFound = true; else pulseSensFound = false;
+  if (pulseSensFound) {
+    startupPrintln("OK");
+    pulseSensFound = true;
+  } else {
+    // startupSetColor(TFT_RED);
+    startupPrintln("ERROR");
+    pulseSensFound = false;
+  }
+  //startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  // startupSetColor(TFT_GREEN);
+
+  // --- Тест RGB ---
+  startupNewLine();
+  startupSprite.pushSprite(0, 0);
+  //delay(200);
+  // startupSetColor(TFT_GREEN);
+  startupPrint("RGB module ------------");
+  delay(20);
+  startupPrint("--");
   digitalWrite(LED_R, LOW); delay(200);
   clackBuzzer();
-  digitalWrite(LED_R, HIGH); 
-  delay(100);
+  digitalWrite(LED_R, HIGH);
+  delay(10);
 
-  tft.print("--");
-  digitalWrite(LED_G, LOW);  delay(200);
+  startupPrint("--");
+  digitalWrite(LED_G, LOW); delay(200);
   clackBuzzer();
-  digitalWrite(LED_G, HIGH); 
-  delay(100);
+  digitalWrite(LED_G, HIGH);
+  delay(10);
 
-  tft.print("--");
-  digitalWrite(LED_B, LOW);  delay(200);
+  startupPrint("--");
+  digitalWrite(LED_B, LOW); delay(200);
   clackBuzzer();
   digitalWrite(LED_B, HIGH);
-  delay(100);
-  tft.println(" OK");
+  delay(10);
+  startupPrintln(" OK");
 
-  //SetupDigits();
   initKeyboard();
-  delay(1500);
-
+  //delay(100);
+  startupNewLine();
+  startupPrintln("***** Self check END *****");
+  startupNewLine();
+  delay(10);
+  startupPrintln("Loading operating system....");
+  delay(100);
+  // Освобождаем спрайт — экономим RAM перед основным циклом
+  startupRelease();
 }
+
 
 bool LoadBackUpFromEPPR()
 {
@@ -1698,8 +1940,10 @@ void drawPipBoyScreen() {
   clickBuzzer();
   tft.fillScreen(TFT_BLACK);
   drawScanlines();
-  updateHPAP();
+  
   // Top bar
+  updateHPAP();
+
   tft.setTextColor(TFT_GREEN);
   tft.setTextDatum(MC_DATUM);
   tft.drawRect(0, 0, TFT_WIDTH_SCREEN, 28, TFT_GREEN);
@@ -1707,7 +1951,7 @@ void drawPipBoyScreen() {
   tft.setTextSize(2);
   tft.setCursor(12, 6);
   tft.print("STATS");
-  tft.setTextSize(1);
+  /*tft.setTextSize(1);
   tft.setCursor(80, 10);
   tft.print("LVL 20");
   tft.setCursor(135, 10);
@@ -1718,7 +1962,7 @@ void drawPipBoyScreen() {
   {
     tft.setCursor(280, 10);
     tft.print("XP MAX");
-  }
+  }*/
 
 
   UpdateLeftPanel();
@@ -2346,13 +2590,13 @@ void handleWeatherSettingsTouch(uint16_t x, uint16_t y) {
   }
   // gps get
   if (x >= SCREEN_CENTER - 60 && x <= SCREEN_CENTER + 60 && y >= SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 + BUTTON_H + 10 && y <= SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 + 10 + BUTTON_H*2) {
-  if (gps.hasFix()) {
+  if (gpsHasFix()) {
     digitalWrite(LED_B, LOW);
     tft.fillRect(SCREEN_CENTER - 60, SCREEN_HEADER_Y + INPUT_FIELD_H * 2 + 15 * 2 + BUTTON_H + 10 , 120, BUTTON_H, TFT_GREEN);
     delay(30);
     digitalWrite(LED_B, HIGH);
-    weatherLat = String(gps.getLat(), 6);
-    weatherLon = String(gps.getLng(), 6);
+    weatherLat = String(gpsGetLat(), 6);
+    weatherLon = String(gpsGetLon(), 6);
     clickBuzzer();
     drawWeatherSettings();
     return;
@@ -2875,9 +3119,9 @@ void drawPipBoyScreen5()
    
     bool gpsActive = false;
     
-    if (GPS_Connected && gps.hasFix()) {
-        gpsLat= gps.getLat();
-        gpsLon= gps.getLng();
+    if (GPS_Connected && gpsHasFix()) {
+        gpsLat= gpsGetLat();
+        gpsLon= gpsGetLon();
         gpsActive = true;
     }
     else
@@ -2954,6 +3198,21 @@ void drawPipBoyScreen5()
           tft.drawString("+", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13);  
         }
 
+        if (laserModule)
+        {
+          laserActive = false;
+          if (!laserActive)
+          {
+            tft.setTextDatum(TC_DATUM);
+            tft.setTextSize(2);
+            tft.setTextColor(TFT_GREEN);
+            tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y + 50, 42, 42, TFT_BLACK);
+            tft.drawRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y + 50, 42, 42, TFT_GREEN);
+            tft.drawString("*->", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13 + 50);      
+            
+          }
+        }
+
     // GPS статус — Bottom-Left над табами
       UpdateMapInfoPanel();
         
@@ -2998,6 +3257,7 @@ void handleButtonScreen5(uint16_t x, uint16_t y)
           tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y, 42, 42, TFT_GREEN);
           tft.drawString("+", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13);  
         }
+       
     // Загружаем тайлы нового zoom (если нет на SD — скачает)
         uint16_t pbW = ( TFT_WIDTH_SCREEN / 2);
         uint16_t pbH = 8;
@@ -3015,6 +3275,33 @@ void handleButtonScreen5(uint16_t x, uint16_t y)
     return;
   }
 
+if (x >= TFT_WIDTH_SCREEN - 5 - 45 && x <= TFT_WIDTH_SCREEN - 5 && y >= MAP_START_Y+ 50 && y <= MAP_START_Y + 42+ 50 && laserModule) {
+    digitalWrite(LED_G, LOW);
+    delay(30);
+    digitalWrite(LED_G, HIGH);
+    clickBuzzer();
+    laserActive = !laserActive;
+    if (laserModule)
+    {
+          tft.setTextDatum(TC_DATUM);
+          tft.setTextSize(2);
+        if (laserActive)
+        {
+          tft.setTextColor(TFT_BLACK);
+          tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y + 50, 42, 42, TFT_GREEN);
+          tft.drawString("*->", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13 + 50);   
+        }
+        else
+        {
+            tft.setTextColor(TFT_GREEN);
+            tft.fillRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y + 50, 42, 42, TFT_BLACK);
+            tft.drawRect(TFT_WIDTH_SCREEN - 5 - 45 , MAP_START_Y + 50, 42, 42, TFT_GREEN);
+            tft.drawString("*->", TFT_WIDTH_SCREEN - 5 - 22, MAP_START_Y + 13 + 50);
+            tft.fillRect(TFT_WIDTH_SCREEN - 80 , 5, 80, 10, TFT_BLACK);
+        }
+    }
+    }
+
 }
 
 
@@ -3023,9 +3310,9 @@ void UpdateMapInfoPanel()
     
     bool gpsActive = false;
     
-    if (GPS_Connected && gps.hasFix()) {
-        gpsLat= gps.getLat();
-        gpsLon= gps.getLng();
+    if (GPS_Connected && gpsHasFix()) {
+        gpsLat= gpsGetLat();
+        gpsLon= gpsGetLon();
         gpsActive = true;
     }else
     {
@@ -3065,14 +3352,12 @@ void UpdateMapInfoPanel()
         tft.setTextDatum(BL_DATUM);
         tft.setTextSize(1);
             String gpsTstr = " ";
-            if (gps.hasTime() && GPS_Connected) 
-                gpsTstr = " Time: " + String(gps.getTimeString()) + "                     " ;
-            else
+            
                 gpsTstr = "                 ";
             tft.setCursor(5,  TAB_Y - 12);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
         if (gpsActive && GPS_Connected) {     
-            tft.print("[GPS]: <LIVE> | SATS:" + String(gps.getSats()) + gpsTstr + " Speed: " + String(gps.getSpeedKmph()) + " km/h   ") ;
+            tft.print("[GPS]: <LIVE> | SATS:" + String(gpsGetSats()) + gpsTstr + " SPEED: " + String(gpsGetSpeedKmph())) ;
         } else {
             tft.print("[GPS]: <OFFLINE> " + gpsTstr );
         }
@@ -3204,6 +3489,8 @@ void updateHPAP() {
   {
     if (pulseSensorUpdate())
       psActive = true;
+    else 
+      psActive = false;
   } 
 
   if (!psActive)
@@ -3260,20 +3547,24 @@ void updateHPAP() {
       drawScanlinesButtons(132, 5, 14, TFT_WIDTH_SCREEN - 3 - 132);
       tft.setTextColor(TFT_GREEN);
       tft.setTextSize(1);
+      tft.setTextWrap(false);
       tft.setTextDatum(MC_DATUM);
-      tft.setCursor(135, 10);
+      tft.setCursor(132, 10);
       if (psActive)
-      tft.printf("BPM %d/%d\n", currentHP, hpMax);
+      {
+        tft.printf("BPM %d/%d\n", currentHP, hpMax);
+        tft.setCursor(210, 10);
+        tft.printf("SPO2 %d/%d", currentAP, 100);
+        tft.setCursor(287, 10);
+        tft.print("PULSE ACTIVE");
+      }
       else
-      tft.printf("HP %d/%d\n", currentHP, hpMax);
-      tft.setCursor(210, 10);
-      tft.printf("AP %d/%d", currentAP, apMax);
-      //if (currentHP == hpMax)
-      if (psActive)
-        {
-          tft.setCursor(280, 10);
-          tft.print("PULSE ACTIVE");
-        }
+      {
+        tft.printf("HP %d/%d\n", currentHP, hpMax);
+        tft.setCursor(210, 10);
+        tft.printf("AP %d/%d", currentAP, apMax);
+      }
+     
     }
   
 }
@@ -3332,28 +3623,16 @@ void UpdateLeftPanel()
       {
         yStartP = yStartP + heighttext + 8;
         tft.setCursor(12, yStartP);
-        if (gps.hasTime())
-        {
-          if (gps.hasFix())
-          { 
-            tft.drawRect(9, yStartP - 2, 29, heighttext + 4, TFT_GREEN);
-            tft.print("GPS");
-          }
-          else
-            tft.print("GPS T");
-          
-        } else
-        {
-          if (gps.hasFix()) tft.drawRect(9, yStartP - 2, 29, heighttext + 4, TFT_GREEN);
-          tft.print("GPS");
-        }
+        if (gpsHasFix()) tft.drawRect(9, yStartP - 2, 29, heighttext + 4, TFT_GREEN);
+        tft.print("GPS");
+        
       }
 
   if (pulseSensFound) 
       {
         yStartP = yStartP + heighttext + 8;
         tft.setCursor(12, yStartP);
-        if (psActive) tft.drawRect(9, yStartP - 2, 35,  heighttext + 4, TFT_GREEN);
+        if (pulseSensorUpdate()) tft.drawRect(9, yStartP - 2, 35,  heighttext + 4, TFT_GREEN);
         tft.print("PULSE");
       }
 
@@ -3388,6 +3667,9 @@ void UpdateLeftPanel()
 
 void UpdateRightPanel()
 {
+
+  if (currentScreen != 0) return;
+
       tft.setTextColor(TFT_GREEN);
       tft.setTextSize(TIMERS_TEXT_SIZE);
       tft.setTextDatum(MC_DATUM);
@@ -3834,55 +4116,62 @@ void drawUpdateInfo()
 
 bool pulseSensorUpdate()
 {
-  //digitalWrite(PULSE_SENSOR_VCC, HIGH);
-  //delay(100);
   
-  int raw = pulse.getRaw();
-  int bpm = pulse.getBPM();
-
-if (DEBUGFLAG && pulseSensFound) 
-    {
       tft.setTextSize(1);
       tft.setTextDatum(TR_DATUM);
       tft.setTextColor(TFT_GREEN);
-      // Закрасить старое значение
-      String src = "BPM: 300  RAW: 0000";
-      int tws = tft.textWidth(src);             
-      tft.fillRect(5, SCREEN_BOTTOM_Y - 20, tws, 20, TFT_BLACK);
-      src = "BPM: " + String(bpm) + "  RAW: " + String(raw);
-      tft.drawString(src, 5 + tws, SCREEN_BOTTOM_Y - 12);
+     String src = " BPM:300 SPO2:000";
+     int tws = tft.textWidth(src);  
+            
+   if (!pulseSensorConnected && pulseSensFound) {
+            if (DEBUGFLAG)  Serial.println("[UI PULSE] Pulse not connected");
+        } else {
+            PulseData pd = pulseGetData();
+              int raw = pd.spo2;
+              int bpm = pd.bpm;
+            if (pd.status == PULSE_FINGER_NOT_DETECTED) {
+                //if (DEBUGFLAG)  Serial.println("[UI PULSE] Finger out");
+                if (DEBUGFLAG)  {
+                tft.fillRect(0, SCREEN_BOTTOM_Y - 70, tws, 10, TFT_BLUE);
+                tft.drawString("Body Not detected", tws, SCREEN_BOTTOM_Y - 68);
+                }
+                return false;
+            } else if (pd.status = PULSE_CALIBRATING) {
+                bpm = 0;
+                if (DEBUGFLAG)  Serial.print("[UI PULSE] Calibrate\n");
+            } else if (pd.status == PULSE_OK && pd.status != PULSE_CALIBRATING) {
+                if (DEBUGFLAG)  Serial.printf("[UI PULSE] BPM:%d SpO2:%d%%\n", pd.bpm, pd.spo2);
+            }
+    
+
+if (DEBUGFLAG && pulseSensFound) 
+    {
+      // Закрасить старое значение           
+      tft.fillRect(0, SCREEN_BOTTOM_Y - 70, tws, 10, TFT_BLUE);
+      if (pd.status == PULSE_OK && pd.status != PULSE_CALIBRATING) {
+      src = "BPM:" + String(bpm) + " SpO2:" + String(raw);
+      tft.drawString(src, tws, SCREEN_BOTTOM_Y - 68);
+      }
+      else
+        tft.drawString("Calibrating..", tws, SCREEN_BOTTOM_Y - 68);
+      //if (DEBUGFLAG) { Serial.printf("[UI PULSE] Status: %s\n", pulseStatusToString(pd.status)); }
     }
 
-if (!pulse.onFinger())
-{
- /// if (DEBUGFLAG) Serial.println("[PULSE] Not on hand");
- // if (DEBUGFLAG) Serial.print("   Raw: "); Serial.println(raw);
-    
- return false;
-}
-   // if (pulse.isChanged())
-   //   clackBuzzer();
 
-    
+
   if (bpm > 0)
   {  
-   // if (DEBUGFLAG) Serial.print("[PULSE] BPM: "); Serial.print(bpm);
-    //if (DEBUGFLAG) Serial.print(" Raw: ");
-    // Serial.println(" ");
     currentHP = bpm;
-    currentAP = raw / 20;
-    
-    //if (pulse.checkBeep())
-     // clickBuzzer();
+    currentAP = raw;// / 20;
+
     return true;
 
   } else {
 
-    currentAP = raw / 20;
-    //if (DEBUGFLAG) Serial.println("[PULSE] NO PULSE");
+    currentAP = raw;// / 20;
     return false; 
   }
-
+        }
 }
 
 void clickBuzzer()
@@ -3919,7 +4208,7 @@ int idxdt = random(0, (sizeof(dtmf) / sizeof(dtmf[0])));
 
 tone(BUZZER_PIN, 8220 , 10);
 delay(50);
- for (int i = 0; i < 8; i++)
+ for (int i = 0; i < 6; i++)
   {
     idxdt = random(0, (sizeof(dtmf) / sizeof(dtmf[0])));
     rdeldt = random(10, 60);
@@ -3932,7 +4221,7 @@ delay(50);
      
   }
   tone(BUZZER_PIN, 120 , 10);
-     delay(20);
+  //   delay(20);
   noTone(BUZZER_PIN);
 }
 
@@ -4069,3 +4358,77 @@ void geigerTick(int level) {
   }
 }
 
+bool NeedSyncDataTime()
+{
+  DateTime rtcNow = rtc.now();
+  if (eepromUpdateDataTime = 0)
+  {
+    if (SyncLoadFromEEPROM())
+    {
+        if (year(eepromUpdateDataTime) != rtcNow.year() ||  month(eepromUpdateDataTime) != rtcNow.month() || day(eepromUpdateDataTime) !=  rtcNow.day())
+          return true;
+        else
+          return false;
+    } else
+    {
+    if (year(eepromUpdateDataTime) != rtcNow.year() || month(eepromUpdateDataTime) != rtcNow.month() || day(eepromUpdateDataTime) !=  rtcNow.day())
+          return true;
+        else
+          return false;
+    }
+  }
+  return true;
+}
+
+// ======================= EEPROM =======================
+
+
+bool SyncLoadFromEEPROM() {
+  LastSyncDateTime data;
+  
+  // Очистка перед чтением
+  memset(&data, 0, sizeof(LastSyncDateTime));
+  
+  if (!eepromReadSlot(5, (uint8_t*)&data)) {
+    if (DEBUGFLAG) Serial.println("[SYNC] read SLOT 5 --- failed");
+    return false;
+  }
+  
+  // Загрузка данных
+
+  //eepromDataTime = data.timestamp;
+  // Восстановление времени
+  time_t rtcNow = now();
+  eepromUpdateDataTime = data.lastSyncDT;
+
+  if (eepromUpdateDataTime > rtcNow) {
+   rtc.adjust(DateTime(year(eepromUpdateDataTime), month(eepromUpdateDataTime), day(eepromUpdateDataTime), 
+                     hour(eepromUpdateDataTime), minute(eepromUpdateDataTime), second(eepromUpdateDataTime)));
+    Serial.print("[SYNC] Date in RTC older then in Time Sync backup. Adjust RTC.\n");
+    DateTime rtcNow = rtc.now();
+    setTime(rtcNow.unixtime());
+  }
+
+  #if DEBUGFLAG
+  Serial.print("[SYNC] EEPROM SLOT 5 loaded OK:");
+    char stringwu[32];
+    snprintf(stringwu, sizeof(stringwu), "%02d.%02d.%04d %02d:%02d:%02d", day(eepromUpdateDataTime), month(eepromUpdateDataTime), year(eepromUpdateDataTime), hour(eepromUpdateDataTime), minute(eepromUpdateDataTime), second(eepromUpdateDataTime));
+    Serial.printf(" %s\n", stringwu); 
+  #endif
+  return true;
+}
+
+
+void SyncSaveToEEPROM() {
+  LastSyncDateTime data;
+  
+  // Очистка всей структуры перед использованием!
+  memset(&data, 0, sizeof(LastSyncDateTime));
+  
+  data.lastSyncDT = (uint32_t)now();
+  eepromUpdateDataTime = now();
+
+  if (eepromWriteSlot(5, (uint8_t*)&data)) {
+   if (DEBUGFLAG)  Serial.println("[SYNC] Date time saved to SLOT 5 EEPROM");
+  }
+}

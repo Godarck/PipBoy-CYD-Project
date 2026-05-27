@@ -3,9 +3,9 @@
 
 #include <Arduino.h>
 
-//#define CYD2_4        // Uncomment if you use 2.4 CYD
-#define CYD3_5          // Uncomment if you use 3.5 CYD
-#define DEBUGFLAG true  // Uncomment if you need Serial monitor debug & GPS blue window debug on screen
+#define CYD2_4        // Uncomment if you use 2.4 CYD
+//#define CYD3_5          // Uncomment if you use 3.5 CYD
+#define DEBUGFLAG true  // Uncomment if you need Serial monitor debug & GPS blue window debug on screen & pulse debug info
 
 #define PERSON_NAME "SAM"
 /*
@@ -92,13 +92,81 @@
 #define OFFSET_TEMP
 #define BASE_ALT
 
-// ======================= Pulse Sensor 3 pin Analog ======================= 
-#define PULSE_SENSOR_PIN    255 //use 255 for inactive
-//#define PULSE_SENSOR_VCC 8
+// ======================= Pulse Sensor MAX30102 pin i2c ======================= 
+
+// --- Настройки как в примере, но под MAX30102 ---
+#define PULSE_I2C_SDA             RTC_SDA
+#define PULSE_I2C_SCL             RTC_SCL
+#define MAX30102_I2C_ADDR         0x57
+#define PULSE_LED_BRIGHTNESS      0x7F  // 127 как в примере
+#define PULSE_SAMPLE_AVERAGE      1     // 1 = без усреднения! (как в примере)
+#define PULSE_LED_MODE            2     // 2 = Red+IR (для MAX30102)
+#define PULSE_SAMPLE_RATE         100   // 100 Гц
+#define PULSE_PULSE_WIDTH         69    // 69 мкс (как в примере)
+#define PULSE_ADC_RANGE           4096  // как в примере
+#define BUFFER_LENGTH             100
+#define PULSE_FINGER_IR_THRESHOLD 9000 //3000
+#define CALIBRATION_TIMEOUT_MS    8000
+
 
 // ======================= GPS GY-NE06MV2 ======================= 
-#define GPS_ONTX_PIN 32
-#define GPS_ONRX_PIN 35
+
+
+// ============================================
+// ВЫБЕРИТЕ ОДИН ИЗ ТРЁХ РЕЖИМОВ:
+// ============================================
+
+// Режим 1: GPS через I2C с ESP32-C3 (умный мост + LED)
+ //#define GPS_USE_I2C_C3
+
+// Режим 2: GPS напрямую через UART (стандартный NEO-6M)
+// #define GPS_USE_UART
+
+// Режим 3: GPS через I2C-UART мост SC16IS750
+//#define GPS_USE_I2C_SC16IS750
+
+#ifdef CYD3_5
+  #define GPS_USE_UART // or
+  // #define GPS_USE_I2C_SC16IS750 // or
+  // #define GPS_USE_I2C_C3
+#endif
+
+#ifdef CYD2_4
+  #define GPS_USE_I2C_C3 // or 
+  // #define GPS_USE_I2C_SC16IS750
+#endif
+
+// ============================================
+// НАСТРОЙКИ I2C (для режима C3)
+// ============================================
+#ifdef GPS_USE_I2C_C3
+  #define C3_I2C_ADDR         0x10
+  #define GPS_I2C_PACKET_SIZE 34   // magic(1) + data(32) + checksum(1)
+  #define GPS_PACKET_MAGIC    0xC3
+#endif
+
+// ============================================
+// НАСТРОЙКИ I2C-SC16IS750 (для режима моста)
+// ============================================
+#ifdef GPS_USE_I2C_SC16IS750
+  #define GPS_SC16IS750_ADDR   0x48      // 7-bit I2C адрес (A0=A1=GND → 0x48)
+  #define GPS_SC16IS750_XTAL   1843200UL // кварц на модуле в Гц (1.8432 МГц стандарт) 1843200UL
+  // Если на вашем модуле кварц 12 МГц — укажите 12000000UL
+#endif
+
+// ============================================
+// НАСТРОЙКИ UART (для прямого режима и моста)
+// ============================================
+#if defined(GPS_USE_UART) || defined(GPS_USE_I2C_SC16IS750)
+  #define GPS_UART_BAUD       9600
+#endif
+
+#ifdef GPS_USE_UART
+  #define GPS_UART_NUM        2       // HardwareSerial(2)
+  #define GPS_UART_RX_PIN     16      // <-- Укажи свои пины!
+  #define GPS_UART_TX_PIN     17      // <-- Укажи свои пины!
+#endif
+
 #define CHANGE_PIP_COLOR 1
 #define MAP_START_X 5 //90 // 5
 #define MAP_START_Y 35 //45 //35
@@ -106,6 +174,25 @@
 #define MAP_END_Y TAB_Y - 20 // 245
 #define MAP_ZOOM_OUT 12
 #define MAP_ZOOM_IN 16
+
+
+// ======================= TOF10120 Time-of-Flight Laser Distance Sensor ======================= 
+// ============================== I2C interface  =========================== 
+
+// I2C адрес (7-bit). В даташите указан 0xA4 (8-bit), 
+// но библиотека Wire использует 7-bit адресацию -> 0x52 (82)
+#define TOF10120_I2C_ADDR         0x52
+// Минимальный интервал между опросами, мс (по даташиту ≥30 мс)
+#define TOF10120_READ_INTERVAL    150
+// I2C таймаут на одну транзакцию, мс
+#define TOF10120_I2C_TIMEOUT      100
+// Диапазон валидации, мм
+#define TOF10120_MIN_DISTANCE     20
+#define TOF10120_MAX_DISTANCE     2000
+// Значение при ошибке чтения
+#define TOF10120_ERROR_VALUE      -1
+// Размер окна скользящего среднего (фильтр)
+#define TOF10120_FILTER_WINDOW    5
 
 // ======================= WiFi / NTP =======================
 #define NTP_SERVER "pool.ntp.org"
