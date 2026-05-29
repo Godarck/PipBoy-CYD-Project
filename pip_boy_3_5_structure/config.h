@@ -5,7 +5,7 @@
 
 //#define CYD2_4        // Uncomment if you use 2.4 CYD and in USER_SETUP.h
 #define CYD3_5          // Uncomment if you use 3.5 CYD
-#define DEBUGFLAG true  // TRUE if you need Serial monitor debug & GPS blue window debug on screen & pulse debug info
+#define DEBUGFLAG false  // TRUE if you need Serial monitor debug & GPS blue window debug on screen & pulse debug info
 
 #define PERSON_NAME "SAM"
 /*

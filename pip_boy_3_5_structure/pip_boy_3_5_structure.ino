@@ -50,18 +50,19 @@ ARDUINO IDE PREFERENCES:
   Default folder from SD card for mp3 in RadioModule.cpp  (only for first use)
 
 * ====== components =========
-  CYD: 2.4 inch ESP32-2432S024R with Resistive touch (Only type-c usb connector, RGB led in Front near display. )
-  OR CYD: ESP32 3.5 inch 320x480 with Resisteve Touch (Only micro usb connector, RGB led in Front near display. )
+  CYD: 2.4 inch ESP32-2432S024R 240x320 with Resistive touch (Only type-c usb connector, RGB led in Front near display. )
+  OR CYD: 3.5 inch ESP323-248S035R  320x480 with Resisteve Touch (Only micro usb connector, RGB led in Front near display. )
   RTC + EEPROM :   Tyni RTC I2C module DS1307
   Connectors:      JST 1.25 4pin - for i2c bus
                    JST 1.25 2pin (2 pcs)  - for dinamic and battery
+                   FPC 0.5 6p - for GPS
   Audio: 4 Omh speaker
   ! MicroSD card 1-16 GB for Radio via mp3 & for cash map png tiles
 
  Для работы часов нужен модуль с флэшкой памяти (на модуле должно быть две 8 ногих микросхемы)/ либо флэшка памяти отдельно i2c
 
  PULSE MAX30102 or MAX30105 (better) На главном экране HP и AP  меняется на BPM и SpO2 значения с датчика, если он распознал руку
- GPS NEO-6M (подключение 3 варианта < смотреть config.h > : UART через FPC разъем  1 = 3.3v, 3 = TX GPS, 4 = RX GPS, 6 = GND
+ GPS NEO-6M (подключение 3 варианта < смотреть config.h > : UART через FPC разъем  1 = 3.3v, 3 = TX GPS, 4 = RX GPS, 6 = GND (revers 6 - VCC, GND - 1, RX GPS - 3, TX GPS - 4)
                                                             BRIDGE через переходник SC16IS750 UART -> i2c 
                                                             i2c через ESP32C3SuperMini )
  LaserDistance Meter TOF10120 (подключение через i2c) на экране с картой будет кнопка с активацией дальномера

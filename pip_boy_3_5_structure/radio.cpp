@@ -114,7 +114,8 @@ static void loadPlaylist(const String& folder)
             String name = f.name();
             if ((name.endsWith(".mp3") || name.endsWith(".MP3")) && (f.size() > 8096)) {
                 sdPlaylist.push_back(name);
-                if (DEBUGFLAG) Serial.printf("[RADIO]  [%d] %s - size:%d\n", n++, name.c_str(), f.size() );
+                if (DEBUGFLAG) Serial.printf("[RADIO]  [%d] %s - size:%d\n", n, name.c_str(), f.size() );
+                n++;
             }
         }
         f.close(); f = dir.openNextFile();
@@ -138,7 +139,13 @@ static void startWiFi(int index)
     gen  = new AudioGeneratorMP3();
 
     if (gen->begin(buff, out)) {
-        out->SetGain(curVolume / 100.0);
+
+    #if defined(CYD3_5) 
+        out->SetGain(curVolume / 200.0); 
+    #else
+        out->SetGain(curVolume / 100.0); 
+    #endif
+
         isPlayingFlag = true;
         snprintf(currentSongInfo, 512, "%s", radioStations[index].name);
         //UpdateMetaData();
@@ -173,7 +180,11 @@ static void startSD(int index)
     gen = new AudioGeneratorMP3();
 
     if (gen->begin(buff, out)) {
-        out->SetGain(curVolume / 100.0);
+    #if defined(CYD3_5) 
+        out->SetGain(curVolume / 200.0); 
+    #else
+        out->SetGain(curVolume / 100.0); 
+    #endif
         isPlayingFlag = true;
         snprintf(currentSongInfo, 512, "%s", sdPlaylist[index].c_str());
         //UpdateMetaData();
@@ -209,7 +220,14 @@ static void processCmd(const Cmd& c)
             break;
         case CMD_SET_VOL:
             curVolume = constrain(c.value, 0, 100);
-            if (out) out->SetGain(curVolume / 100.0);
+            if (out) 
+            {
+            #if defined(CYD3_5) 
+                out->SetGain(curVolume / 200.0); 
+            #else
+                out->SetGain(curVolume / 100.0); 
+            #endif
+            }
             if (DEBUGFLAG) Serial.printf("[RADIO] Vol=%d\n", curVolume);
             break;
     }
@@ -340,7 +358,12 @@ void radioStop() {
 void radioSetVolume(uint8_t vol) {
 
     curVolume = constrain(vol, 0, 100);
-    out->SetGain(vol / 100.0); 
+    #if defined(CYD3_5) 
+        out->SetGain(vol / 200.0); 
+    #else
+        out->SetGain(vol / 100.0); 
+    #endif
+
     curVolume = vol;
     if (DEBUGFLAG) Serial.printf("[RADIO] Volume=%d\n", curVolume);
 } //sendCmd(CMD_SET_VOL, vol); }
@@ -604,14 +627,4 @@ void cyrToLat(const char* in, char* out) {
 }
 
 
-// ========== Пример использования ==========
-// #include <stdio.h>
-// int main() {
-//     char in[256]  = "Привет, мир! Ёлка — это Щука.";
-//     char out[256] = {0};
-//     cyrToLat(in, out);
-//     printf("%s\n", out); 
-//     // Pryvet, mir! Yolka — eto Shhuka.
-//     return 0;
-// }
 
