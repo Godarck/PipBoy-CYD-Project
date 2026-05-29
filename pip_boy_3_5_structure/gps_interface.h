@@ -6,7 +6,7 @@
 // Инициализация модуля (вызывать в setup)
 void gpsInit();
 
-// Проверка физической связи с GPS UART / C3-мостом / SC16IS750.
+// Проверка физической связи с GPS / C3-мостом / SC16IS750.
 bool gpsCheckConnection();
 
 // Обновление данных (вызывать в loop, желательно каждые 100-500 мс)
@@ -19,9 +19,9 @@ float    gpsGetLat();           // широта в градусах
 float    gpsGetLon();           // долгота в градусах
 float    gpsGetHdop();          // горизонтальная точность
 
-// --- TinyGPS++ 1.1.0 новые методы ---
-uint8_t  gpsGetFixQuality();    // 0=invalid, 1=GPS, 2=DGPS, 4=RTK fixed, 5=RTK float...
-uint8_t  gpsGetFixMode();       // 1=No fix, 2=2D, 3=3D
+// --- TinyGPS++ 1.1.0 fix quality ---
+// 0=invalid, 1=GPS, 2=DGPS, 3=PPS, 4=RTK fixed, 5=RTK float, 6=Estimated, 7=Manual, 8=Simulated
+uint8_t  gpsGetFixQuality();
 
 // --- Движение и высота ---
 float    gpsGetSpeedKmph();     // скорость в км/ч

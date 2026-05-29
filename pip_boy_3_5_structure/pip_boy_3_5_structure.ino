@@ -38,6 +38,10 @@ ARDUINO IDE PREFERENCES:
   TinyGPSPlus by Mikal Hart             ver 0.0.4
 
 * ======== See config.h for base setup.  ======== 
+Расскоментировать одну из строк, в зависимости от того какая плата используется
+  //  #define CYD2_4          // Uncomment if you use 2.4 CYD
+   // #define CYD3_5          // Uncomment if you use 3.5 CYD
+
   PERSON_NAME - Name in main screen
   DEBUGFLAG - if you need debug. Set flag true for first run.
     Use Serial monitor to watch Debug information.
@@ -47,6 +51,7 @@ ARDUINO IDE PREFERENCES:
 
 * ====== components =========
   CYD: 2.4 inch ESP32-2432S024R with Resistive touch (Only type-c usb connector, RGB led in Front near display. )
+  OR CYD: ESP32 3.5 inch 320x480 with Resisteve Touch (Only micro usb connector, RGB led in Front near display. )
   RTC + EEPROM :   Tyni RTC I2C module DS1307
   Connectors:      JST 1.25 4pin - for i2c bus
                    JST 1.25 2pin (2 pcs)  - for dinamic and battery
@@ -54,7 +59,12 @@ ARDUINO IDE PREFERENCES:
   ! MicroSD card 1-16 GB for Radio via mp3 & for cash map png tiles
 
  Для работы часов нужен модуль с флэшкой памяти (на модуле должно быть две 8 ногих микросхемы)/ либо флэшка памяти отдельно i2c
- PULSE MAX30102 or MAX30105 (better)
+
+ PULSE MAX30102 or MAX30105 (better) На главном экране HP и AP  меняется на BPM и SpO2 значения с датчика, если он распознал руку
+ GPS NEO-6M (подключение 3 варианта < смотреть config.h > : UART через FPC разъем  1 = 3.3v, 3 = TX GPS, 4 = RX GPS, 6 = GND
+                                                            BRIDGE через переходник SC16IS750 UART -> i2c 
+                                                            i2c через ESP32C3SuperMini )
+ LaserDistance Meter TOF10120 (подключение через i2c) на экране с картой будет кнопка с активацией дальномера
 
  динамик ( можно от мобильника 4 Ом , например с старых айфонов)
  модуль сенсора пульса (опционально) пока не реализовано
@@ -190,16 +200,14 @@ time_t eepromUpdateDataTime = 0;
 // Калибровка тачскрина (rotation 1) 
 // uint16_t calData[5] = { 178, 3762, 323, 3401, 1 };
 
-// (rotation 3)
-//uint16_t calData[5] = { 177, 3713, 340, 3295, 7 };
-//uint16_t calData[5] = { 189, 3748, 307, 3395, 7 };
 
-//CYD 2.4 (rotation 1) 
+
+//CYD 2.4 (rotation 3) 
 #ifdef CYD2_4
   uint16_t calData[5] = { 318, 3540, 321, 3449, 6 };  
 #endif
 
- //CYD 3.5 (rotation 1) 
+ //CYD 3.5 (rotation 3) 
 #ifdef CYD3_5
   uint16_t calData[5] = { 160, 3766, 282, 3404, 7 }; 
 #endif
@@ -540,7 +548,11 @@ void setup() {
     
   // TFT
 
-  
+  //if (BUZZER_PIN == LED_B)
+  //pinMode(35, INPUT_PULLUP);
+  //pinMode(35, INPUT);
+
+
   pinMode(LED_R, OUTPUT);
   pinMode(LED_G, OUTPUT);
   pinMode(LED_B, OUTPUT);
@@ -615,9 +627,6 @@ void setup() {
 void loop() {
   uint16_t xTouch, yTouch;
 
-
-  //radioLoop();
-  //radioLoop();
   geigerTick(vaultFrame);
   if (GPS_Connected == true)
   {
@@ -627,9 +636,12 @@ void loop() {
   static unsigned long lastBpmUpdate = 0;
   
   static unsigned long lastHPAPUpdate = 0;
-  if (pulseSensFound)
+
+  if (pulseSensFound && currentScreen == 0)
   {
-       pulseUpdate();   
+       pulseUpdate(); 
+       pulseDrawGraph(TFT_WIDTH_SCREEN - 61, 2, TFT_GREEN);  
+       //pulseDrawGraph(260, 2, TFT_GREEN);  
   }
 
   if (millis() - lastHPAPUpdate > 1000) {
@@ -660,15 +672,15 @@ void loop() {
           
           String src = "[GPS] Satt: " + String(gpsGetSats()) + " Acc: " + String(gpsGetHdop());
           int tws = tft.textWidth(src); 
-          tft.fillRect(7, SCREEN_BOTTOM_Y - 30 - TAB_H, tws, 22, TFT_NAVY);
+          tft.fillRect(5, SCREEN_BOTTOM_Y - 30 - TAB_H, tws, 22, TFT_NAVY);
          // tft.setCursor(7, SCREEN_BOTTOM_Y - 29 - TAB_H);
-          tft.drawString(srcg, 7, SCREEN_BOTTOM_Y - 30 - TAB_H );
+          tft.drawString(srcg, 5, SCREEN_BOTTOM_Y - 30 - TAB_H );
           //tft.setCursor(7, SCREEN_BOTTOM_Y - 15 - TAB_H);
-          tft.drawString(src, 7, SCREEN_BOTTOM_Y - 16 - TAB_H );
+          tft.drawString(src, 5, SCREEN_BOTTOM_Y - 16 - TAB_H );
         }
     }
 
-    if (pulseSensFound)
+    if (pulseSensFound && currentScreen == 0)
   {
     pulseSensorUpdate();
   }
@@ -1389,6 +1401,7 @@ void initStartUp() {
 #ifdef CYD3_5
   startupPrintln("=== RobCo Ind. PipBoy 3000 v3.5 ===");
 #endif
+
 #ifdef CYD2_4
   startupPrintln("=== RobCo Ind. PipBoy 3000 v2.4 ===");
 #endif
@@ -3543,25 +3556,26 @@ void updateHPAP() {
 
     if (currentScreen == 0)
     {
-      tft.fillRect(132, 8, TFT_WIDTH_SCREEN - 3 - 132, 10, TFT_BLACK);
-      drawScanlinesButtons(132, 5, 14, TFT_WIDTH_SCREEN - 3 - 132);
+      tft.fillRect(122, 8, TFT_WIDTH_SCREEN - 60 - 3 - 122, 10, TFT_BLACK);
+      drawScanlinesButtons(122, 5, 14, TFT_WIDTH_SCREEN - 3 - 122 - 60);
       tft.setTextColor(TFT_GREEN);
       tft.setTextSize(1);
       tft.setTextWrap(false);
       tft.setTextDatum(MC_DATUM);
-      tft.setCursor(132, 10);
+      tft.setCursor(122, 10);
       if (psActive)
       {
         tft.printf("BPM %d/%d\n", currentHP, hpMax);
-        tft.setCursor(210, 10);
+        tft.setCursor(200, 10);
         tft.printf("SPO2 %d/%d", currentAP, 100);
-        tft.setCursor(287, 10);
-        tft.print("PULSE ACTIVE");
+        //tft.setCursor(287, 10);
+        
+        //tft.print("PULSE ACTIVE");
       }
       else
       {
         tft.printf("HP %d/%d\n", currentHP, hpMax);
-        tft.setCursor(210, 10);
+        tft.setCursor(200, 10);
         tft.printf("AP %d/%d", currentAP, apMax);
       }
      
@@ -4129,17 +4143,20 @@ bool pulseSensorUpdate()
             PulseData pd = pulseGetData();
               int raw = pd.spo2;
               int bpm = pd.bpm;
+
+            //if (DEBUGFLAG)  Serial.printf("[UI PULSE] BPM:%d SpO2:%d%%\n", pd.bpm, pd.spo2);
+
             if (pd.status == PULSE_FINGER_NOT_DETECTED) {
                 //if (DEBUGFLAG)  Serial.println("[UI PULSE] Finger out");
                 if (DEBUGFLAG)  {
-                tft.fillRect(0, SCREEN_BOTTOM_Y - 70, tws, 10, TFT_BLUE);
-                tft.drawString("Body Not detected", tws, SCREEN_BOTTOM_Y - 68);
+                tft.fillRect(5, SCREEN_BOTTOM_Y - 82, tws, 10, TFT_BLUE);
+                tft.drawString("Body Not detected", tws + 5, SCREEN_BOTTOM_Y - 80);
                 }
                 return false;
             } else if (pd.status = PULSE_CALIBRATING) {
-                bpm = 0;
+                //bpm = 0;
                 if (DEBUGFLAG)  Serial.print("[UI PULSE] Calibrate\n");
-            } else if (pd.status == PULSE_OK && pd.status != PULSE_CALIBRATING) {
+            } else if (pd.status == PULSE_OK) {
                 if (DEBUGFLAG)  Serial.printf("[UI PULSE] BPM:%d SpO2:%d%%\n", pd.bpm, pd.spo2);
             }
     
@@ -4147,13 +4164,15 @@ bool pulseSensorUpdate()
 if (DEBUGFLAG && pulseSensFound) 
     {
       // Закрасить старое значение           
-      tft.fillRect(0, SCREEN_BOTTOM_Y - 70, tws, 10, TFT_BLUE);
-      if (pd.status == PULSE_OK && pd.status != PULSE_CALIBRATING) {
-      src = "BPM:" + String(bpm) + " SpO2:" + String(raw);
-      tft.drawString(src, tws, SCREEN_BOTTOM_Y - 68);
+      tft.fillRect(5, SCREEN_BOTTOM_Y - 82, tws, 10, TFT_BLUE);
+      if (pd.status = PULSE_CALIBRATING)
+      {
+        tft.drawString("Calibrating..", tws + 5, SCREEN_BOTTOM_Y - 80);
+      } else if (pd.status == PULSE_OK) {
+        src = "BPM:" + String(bpm) + " SpO2:" + String(raw);
+        tft.drawString(src, tws + 5, SCREEN_BOTTOM_Y - 80);
       }
-      else
-        tft.drawString("Calibrating..", tws, SCREEN_BOTTOM_Y - 68);
+      
       //if (DEBUGFLAG) { Serial.printf("[UI PULSE] Status: %s\n", pulseStatusToString(pd.status)); }
     }
 

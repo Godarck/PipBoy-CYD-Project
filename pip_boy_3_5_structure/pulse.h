@@ -2,7 +2,9 @@
 #define PULSE_H
 
 #include <Arduino.h>
-#include "config.h"
+#include <TFT_eSPI.h>
+
+extern TFT_eSPI tft;
 
 enum PulseStatus {
     PULSE_OK = 0,
@@ -12,35 +14,24 @@ enum PulseStatus {
 };
 
 struct PulseData {
-    int bpm;              // Удары в минуту
-    int spo2;             // SpO2 %
-    bool fingerDetected;  // Палец приложен?
-    float temperaure;
-    PulseStatus status;   // Текущий статус
+    int bpm;
+    int spo2;
+    float temperature;
+    bool fingerDetected;
+    PulseStatus status;
 };
 
-// --- Флаг физического подключения ---
-// true = датчик отвечает по I2C. Обновляется в pulseInit() и pulseCheckConnection().
 extern bool pulseSensorConnected;
 
-// Инициализация (в setup)
 bool pulseInit();
-
-// Повторная проверка связи с датчиком.
-// Если датчик был не найден — пробует переинициализировать.
-// Если был найден — проверяет, не отвалился ли.
-// Возвращает pulseSensorConnected.
 bool pulseCheckConnection();
-
-// Основной цикл обработки (в loop, часто)
 void pulseUpdate();
-
-// Получить текущие данные
 PulseData pulseGetData();
-
-// Есть ли валидные данные для отображения
 bool pulseHasValidData();
-
 const char* pulseStatusToString(PulseStatus status);
+
+// --- НОВОЕ: отрисовка графика пульсаций ---
+// x,y — координаты левого верхнего угла на экране
+void pulseDrawGraph(int x, int y, uint16_t color = TFT_GREEN);
 
 #endif

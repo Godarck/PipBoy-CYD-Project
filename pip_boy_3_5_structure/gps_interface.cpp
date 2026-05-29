@@ -10,7 +10,7 @@
 
 struct __attribute__((packed)) GpsPacket {
   uint8_t  magic;
-  uint8_t  fix;         // fixMode: 0=нет, 1=2D, 2=3D
+  uint8_t  fix;         // 0=нет, 1=2D, 2=3D (вычисляется на C3)
   uint8_t  sats;
   int32_t  lat;         // microdegrees
   int32_t  lon;         // microdegrees
@@ -19,10 +19,10 @@ struct __attribute__((packed)) GpsPacket {
   uint16_t hdop;        // *100
   uint8_t  led_mode;
   uint8_t  led_r, led_g, led_b;
-  uint8_t  fixQuality;  // TinyGPS++ 1.1.0: 0=invalid, 1=GPS, 2=DGPS, 4=RTK fixed...  	
-  uint16_t speed;       // сотые км/ч (1234 = 12.34 km/h)
-  int32_t  altitude;    // сантиметры (12345 = 123.45 m)
-  uint16_t course;      // сотые градуса (9000 = 90.00°)
+  uint8_t  fixQuality;  // TinyGPS++ FixQuality - '0'
+  uint16_t speed;       // сотые км/ч
+  int32_t  altitude;    // сантиметры
+  uint16_t course;      // сотые градуса
   uint8_t  checksum;
 };
 
@@ -86,7 +86,6 @@ float gpsGetLon()    { return packetValid ? udegToDeg(lastPacket.lon) : 0.0f; }
 float gpsGetHdop()   { return packetValid ? (lastPacket.hdop / 100.0f) : 99.99f; }
 
 uint8_t gpsGetFixQuality() { return packetValid ? lastPacket.fixQuality : 0; }
-uint8_t gpsGetFixMode()    { return packetValid ? lastPacket.fix : 0; }
 
 float gpsGetSpeedKmph() { return packetValid ? (lastPacket.speed / 100.0f) : 0.0f; }
 float gpsGetAltitude()  { return packetValid ? (lastPacket.altitude / 100.0f) : 0.0f; }
@@ -201,8 +200,10 @@ float gpsGetLat()    { return gps.location.isValid() ? gps.location.lat() : 0.0f
 float gpsGetLon()    { return gps.location.isValid() ? gps.location.lng() : 0.0f; }
 float gpsGetHdop()   { return gps.hdop.isValid() ? gps.hdop.hdop() : 99.99f; }
 
-uint8_t gpsGetFixQuality() { return gps.location.fixQuality.isValid() ? gps.location.fixQuality.value() : 0; }
-uint8_t gpsGetFixMode()    { return gps.location.fixMode.isValid()    ? gps.location.fixMode.value()    : 0; }
+uint8_t gpsGetFixQuality() {
+  if (!gps.location.isValid()) return 0;
+  return (uint8_t)(gps.location.FixQuality() - '0');
+}
 
 float gpsGetSpeedKmph() { return gps.speed.isValid()    ? gps.speed.kmph()    : 0.0f; }
 float gpsGetAltitude()  { return gps.altitude.isValid() ? gps.altitude.meters() : 0.0f; }
@@ -313,8 +314,10 @@ float gpsGetLat()    { return gps.location.isValid() ? gps.location.lat() : 0.0f
 float gpsGetLon()    { return gps.location.isValid() ? gps.location.lng() : 0.0f; }
 float gpsGetHdop()   { return gps.hdop.isValid() ? gps.hdop.hdop() : 99.99f; }
 
-uint8_t gpsGetFixQuality() { return gps.location.fixQuality.isValid() ? gps.location.fixQuality.value() : 0; }
-uint8_t gpsGetFixMode()    { return gps.location.fixMode.isValid()    ? gps.location.fixMode.value()    : 0; }
+uint8_t gpsGetFixQuality() {
+  if (!gps.location.isValid()) return 0;
+  return (uint8_t)(gps.location.FixQuality() - '0');
+}
 
 float gpsGetSpeedKmph() { return gps.speed.isValid()    ? gps.speed.kmph()    : 0.0f; }
 float gpsGetAltitude()  { return gps.altitude.isValid() ? gps.altitude.meters() : 0.0f; }

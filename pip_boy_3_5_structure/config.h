@@ -3,9 +3,9 @@
 
 #include <Arduino.h>
 
-#define CYD2_4        // Uncomment if you use 2.4 CYD
-//#define CYD3_5          // Uncomment if you use 3.5 CYD
-#define DEBUGFLAG true  // Uncomment if you need Serial monitor debug & GPS blue window debug on screen & pulse debug info
+//#define CYD2_4        // Uncomment if you use 2.4 CYD and in USER_SETUP.h
+#define CYD3_5          // Uncomment if you use 3.5 CYD
+#define DEBUGFLAG true  // TRUE if you need Serial monitor debug & GPS blue window debug on screen & pulse debug info
 
 #define PERSON_NAME "SAM"
 /*
@@ -42,8 +42,8 @@
 */
 
 #ifdef CYD2_4
-  #define TFT_WIDTH_SCREEN  320 //480
-  #define TFT_HEIGHT_SCREEN 240 //320
+  #define TFT_WIDTH_SCREEN  320
+  #define TFT_HEIGHT_SCREEN 240
 #endif
 
 #ifdef CYD3_5
@@ -98,22 +98,25 @@
 #define PULSE_I2C_SDA             RTC_SDA
 #define PULSE_I2C_SCL             RTC_SCL
 #define MAX30102_I2C_ADDR         0x57
-#define PULSE_LED_BRIGHTNESS      0x7F  // 127 как в примере
-#define PULSE_SAMPLE_AVERAGE      1     // 1 = без усреднения! (как в примере)
-#define PULSE_LED_MODE            2     // 2 = Red+IR (для MAX30102)
-#define PULSE_SAMPLE_RATE         100   // 100 Гц
-#define PULSE_PULSE_WIDTH         69    // 69 мкс (как в примере)
-#define PULSE_ADC_RANGE           4096  // как в примере
-#define BUFFER_LENGTH             100
-#define PULSE_FINGER_IR_THRESHOLD 9000 //3000
+#define PULSE_LED_BRIGHTNESS      0x1F //0x7F  // 127 как в примере | Options: 0=Off to 255=50mA
+#define PULSE_SAMPLE_AVERAGE      8    // //Options: 1, 2, 4, 8, 16, 32 | 1 = без усреднения! (как в примере)
+#define PULSE_LED_MODE            2     // 2 = Red+IR (для MAX30102) | Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
+#define PULSE_SAMPLE_RATE         200   // 100 Гц  | Options: 50, 100, 200, 400, 800, 1000, 1600, 3200 | 100-200 optimal
+#define PULSE_PULSE_WIDTH         411    // 69 мкс (как в примере) | Options: 69, 118, 215, 411
+#define PULSE_ADC_RANGE           4096 //4096  // как в примере | Options: 2048, 4096, 8192, 16384
+#define BUFFER_LENGTH             100     // для графика в углу. min = 60 | for graph in corner on main screen BUFFER_LENGTH >= PULSE_SAMPLE_RATE
+#define PULSE_FINGER_IR_THRESHOLD 50000 //3000
 #define CALIBRATION_TIMEOUT_MS    8000
+  
+#define PULSE_FINGER_RED_MIN      50000
+#define TEMP_READ_INTERVAL_MS     2000
 
 
 // ======================= GPS GY-NE06MV2 ======================= 
 
 
 // ============================================
-// ВЫБЕРИТЕ ОДИН ИЗ ТРЁХ РЕЖИМОВ:
+// ВЫБЕРИТЕ ОДИН ИЗ ТРЁХ РЕЖИМОВ подключения GPS:
 // ============================================
 
 // Режим 1: GPS через I2C с ESP32-C3 (умный мост + LED)
@@ -132,7 +135,8 @@
 #endif
 
 #ifdef CYD2_4
-  #define GPS_USE_I2C_C3 // or 
+  //#define GPS_USE_I2C_C3 // or 
+  #define GPS_USE_UART
   // #define GPS_USE_I2C_SC16IS750
 #endif
 
@@ -161,10 +165,10 @@
   #define GPS_UART_BAUD       9600
 #endif
 
-#ifdef GPS_USE_UART
+#ifdef GPS_USE_UART                   // проверить, что бы не было пересечения с #define BUZZER_PIN
   #define GPS_UART_NUM        2       // HardwareSerial(2)
-  #define GPS_UART_RX_PIN     16      // <-- Укажи свои пины!
-  #define GPS_UART_TX_PIN     17      // <-- Укажи свои пины!
+  #define GPS_UART_RX_PIN     25      // <-- Укажи свои пины! FPC 0.5 6p connector 3 pin
+  #define GPS_UART_TX_PIN     32      // <-- Укажи свои пины! FPC 0.5 6p connector 4 pin
 #endif
 
 #define CHANGE_PIP_COLOR 1
@@ -208,14 +212,19 @@
 #define WEATHER_OPENMETEO 1
 #define WEATHER_EEPROM    2
 
-
-
 // ======================= RADIO =======================
 // Настройки пинов
 #define RADIO_DAC_PIN 26        // GPIO26 - DAC_CHANNEL_2
 #define RADIO_VOLUME_DEFAULT 50 // 0-100 (громкость усилителя 8002D)
 
-#define BUZZER_PIN 32
+#ifdef CYD2_4
+  #define BUZZER_PIN LED_G
+#endif
+
+#ifdef CYD3_5
+  #define BUZZER_PIN LED_G  
+#endif
+
 // =============== Weather ================
 //Координаты GPS по умолчанию для погоды (Москва)
 #define DEFAULT_LAT "55.7558"
@@ -239,14 +248,6 @@
 
 #define TAB_TEXT_SIZE 1
 
-#ifdef CYD3_5
-  #define LVL_TEXT_SIZE 3
-#endif
-  
-#ifdef CYD2_4
-  #define LVL_TEXT_SIZE 2 //3
-#endif
-
 #define TIMERS_TEXT_SIZE 1
 #define LEFTPANEL_TEXT_SIZE 1
 #define KEYBOARD_X 5
@@ -268,8 +269,17 @@
 #define  SCREEN_H (SCREEN_BOTTOM_Y - SCREEN_Y)
 #define  SCREEN_W (TFT_WIDTH_SCREEN - LIST_X - 5)
 #define  SCREEN_CENTER (SCREEN_X + (TFT_WIDTH_SCREEN - SCREEN_X - 5)/2)
-#define  BUTTON_H 30
+
 #define  INPUT_FIELD_H 20   // высота поля ввода
+
+
+#ifdef CYD3_5
+  #define  BUTTON_H 30
+#endif
+
+#ifdef CYD2_4
+  #define  BUTTON_H 25
+#endif
 
 // ================== UI RADIO BUTTONS =================
 #define RADIO_B_X ((TFT_WIDTH_SCREEN / 6) - 2)
@@ -279,13 +289,10 @@
 // ================== WiFi list dimensions =============
 #define LIST_X 85
 #define LIST_Y 40
-//#define tab_b_W  70
 #define LIST_W (TFT_WIDTH_SCREEN - LIST_X  - 35 - 5 )
 #define LIST_H (TFT_HEIGHT_SCREEN - LIST_Y- TAB_H - 10)
 #define LIST_ITEM_H 20
 #define MAX_NETWORKS 15
 
-// ======================= DEBUG =======================
-//void Debug(String label, uint8_t val)
 
 #endif
