@@ -77,11 +77,13 @@ PSRAM: Disabled
 
 * ======== Configure: ======== 
   
-  Config in config.h
+    Config in config.h AND UserSetup.h (TFT_eSPI library)
   
   //#define CYD2_4        // Uncomment if you use 2.4 CYD
   
   //#define CYD3_5          // Uncomment if you use 3.5 CYD
+
+    Config in config.h 
   
   PERSON_NAME - Name in main screen
   
