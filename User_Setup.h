@@ -1,3 +1,8 @@
+
+//#define CYD2_4     // Uncomment if you use 2.4 CYD
+#define CYD3_5   // Uncomment if you use 3.5 CYD
+
+
 //                            USER DEFINED SETTINGS
 //   Set driver type, fonts to be loaded, pins used and SPI control method etc
 //
@@ -221,9 +226,6 @@
 //#define TFT_RST  33  // Reset pin (could connect to Arduino RESET pin)
 //#define TFT_BL   22  // LED back-light
 
-
-//#define CYD2_4     // Uncomment if you use 2.4 CYD
-#define CYD3_5   // Uncomment if you use 3.5 CYD
 
 //====== CYD 3.5 -----------
 #ifdef CYD3_5
