@@ -105,9 +105,13 @@ PSRAM: Disabled
   
   RTC + EEPROM: Tyni RTC I2C module DS1307
   
-  Connectors: JST 1.25 4-pin - for I2C bus
+  Connectors:
+
+    JST 1.25 4-pin - for I2C bus
   
-  JST 1.25 2-pin (2 pcs) - for speaker and battery
+    JST 1.25 2-pin (2 pcs) - for speaker and battery
+  
+    FPC 0.5mm 6p - for GPS
 
 For the watch to work, a module with flash memory is required (the module must have two 8-pin chips) or a separate I2C flash memory card.
 
