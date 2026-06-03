@@ -104,6 +104,16 @@ PSRAM: Disabled
   => CYD ESP32-3248S035R 3.5" 480x320 TFT ST7796  + Resisteve Touch
   
   RTC + EEPROM: Tyni RTC I2C module DS1307
+
+  Additional:
+  
+    GPS NEO-6M 
+
+    GY-MAX30102 Pulse and ox meter
+  
+    TOF10120 laser meter
+
+    BMP280 or BME280 (if you need humidity)
   
   Connectors:
 
@@ -113,12 +123,9 @@ PSRAM: Disabled
   
     FPC 0.5mm 6p - for GPS
 
-For the watch to work, a module with flash memory is required (the module must have two 8-pin chips) or a separate I2C flash memory card.
-
+For the watch to work, a module with flash memory is required (the module must have two 8-pin chips) or a separate I2C flash memory.
 
 Speaker (can be from a mobile phone, for example, from old iPhones)
-
-Heart rate sensor module (optional) not yet implemented
 
 MicroSD flash card (up to 32 GB, the smaller is the better. 8 GB is optimal) FAT32. Music is read from it locally. Fallout radio stations can be found separately.
 
@@ -147,6 +154,8 @@ Weather display function for specified location coordinates
 Wi-Fi functions: scanning, list of networks, connecting to a selected one (must always be connected manually)
 
 HP and AP indicators are calculated automatically, depending on the time of day. During the day, they decrease. After evening, they replenish.
+
+If heart snsor connected HP and AP change to BPM and SpO2
 
 
 * ====== On the main screen ======
